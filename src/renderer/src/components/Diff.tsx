@@ -12,9 +12,9 @@ export function Diff({ text }: { text: string }) {
             : line.startsWith('@@')
               ? 'bg-accent/10 text-accent'
               : c === '+'
-                ? 'bg-emerald-500/12 text-emerald-300'
+                ? 'bg-emerald-50 text-emerald-700'
                 : c === '-'
-                  ? 'bg-rose-500/12 text-rose-300'
+                  ? 'bg-rose-50 text-rose-700'
                   : c === '\\'
                     ? 'text-muted'
                     : 'text-fg/80'

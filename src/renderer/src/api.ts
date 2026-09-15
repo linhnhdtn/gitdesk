@@ -1,5 +1,3 @@
-import type { api as Api } from '../../preload/index.ts'
-
 declare global {
   interface Window {
     api: Api

@@ -31,7 +31,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 grid place-items-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 grid place-items-center bg-black/30" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-[520px] rounded-lg border border-line bg-panel p-5 shadow-2xl"
@@ -68,8 +68,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
           </button>
         </p>
 
-        {note && <p className="mt-3 text-[12px] text-emerald-300">{note}</p>}
-        {err && <p className="mt-3 text-[12px] text-rose-300">{err}</p>}
+        {note && <p className="mt-3 text-[12px] text-emerald-700">{note}</p>}
+        {err && <p className="mt-3 text-[12px] text-rose-700">{err}</p>}
 
         <div className="mt-5 flex gap-2">
           <button
@@ -82,7 +82,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           {who && (
             <button
               onClick={() => must(api.clearToken()).then(() => (setWho(null), setNote('Token removed.')))}
-              className="rounded border border-line px-3 py-1.5 text-muted hover:border-rose-400 hover:text-rose-400"
+              className="rounded border border-line px-3 py-1.5 text-muted hover:border-rose-600 hover:text-rose-600"
             >
               Sign out
             </button>
@@ -133,7 +133,7 @@ export function CreatePr({
   }
 
   return (
-    <div className="fixed inset-0 grid place-items-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 grid place-items-center bg-black/30" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-[560px] rounded-lg border border-line bg-panel p-5 shadow-2xl"
@@ -164,7 +164,7 @@ export function CreatePr({
           <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
           Create as draft
         </label>
-        {err && <p className="mt-3 text-[12px] text-rose-300">{err}</p>}
+        {err && <p className="mt-3 text-[12px] text-rose-700">{err}</p>}
         <div className="mt-5 flex gap-2">
           <button
             disabled={!title.trim() || !base.trim() || busy}

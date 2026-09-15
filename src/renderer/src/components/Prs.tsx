@@ -59,7 +59,7 @@ export function PrList({
           + New Pull Request
         </button>
       </div>
-      {err && <div className="px-3 py-2 text-[12px] text-rose-300">{err}</div>}
+      {err && <div className="px-3 py-2 text-[12px] text-rose-700">{err}</div>}
       <div className="min-h-0 flex-1 overflow-auto">
         {loading && !prs.length && <div className="p-3 text-muted">Loading…</div>}
         {!loading && !prs.length && !err && <div className="p-3 text-muted">No open pull requests</div>}
@@ -135,7 +135,7 @@ export function PrDetail({ pr, repo, onDone }: { pr: PR; repo: Repo; onDone: () 
         </p>
       </div>
 
-      {err && <div className="border-b border-rose-500/30 bg-rose-500/10 px-4 py-2 text-rose-300">{err}</div>}
+      {err && <div className="border-b border-rose-300 bg-rose-50 px-4 py-2 text-rose-700">{err}</div>}
 
       {pr.body && (
         <div className="border-b border-line p-4 whitespace-pre-wrap text-fg/85">{pr.body}</div>
@@ -152,11 +152,11 @@ export function PrDetail({ pr, repo, onDone }: { pr: PR; repo: Repo; onDone: () 
             <span
               className={
                 c.status !== 'completed'
-                  ? 'text-amber-400'
+                  ? 'text-amber-600'
                   : c.conclusion === 'success'
-                    ? 'text-emerald-400'
+                    ? 'text-emerald-700'
                     : c.conclusion === 'failure'
-                      ? 'text-rose-400'
+                      ? 'text-rose-600'
                       : 'text-muted'
               }
             >
@@ -172,7 +172,7 @@ export function PrDetail({ pr, repo, onDone }: { pr: PR; repo: Repo; onDone: () 
         {!revs.length && <div className="text-muted">No reviews yet</div>}
         {revs.map((r, i) => (
           <div key={i}>
-            <span className={r.state === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}>
+            <span className={r.state === 'APPROVED' ? 'text-emerald-700' : 'text-amber-600'}>
               {r.state === 'APPROVED' ? '✓' : '•'}
             </span>{' '}
             {r.user.login} <span className="text-muted">{r.state.toLowerCase().replace('_', ' ')}</span>
@@ -200,7 +200,7 @@ export function PrDetail({ pr, repo, onDone }: { pr: PR; repo: Repo; onDone: () 
         <button
           disabled={busy}
           onClick={() => act(() => must(api.closePR(repo.owner, repo.repo, pr.number)))}
-          className="ml-auto rounded border border-line px-3 py-1.5 text-muted hover:border-rose-400 hover:text-rose-400 disabled:opacity-40"
+          className="ml-auto rounded border border-line px-3 py-1.5 text-muted hover:border-rose-600 hover:text-rose-600 disabled:opacity-40"
         >
           Close
         </button>

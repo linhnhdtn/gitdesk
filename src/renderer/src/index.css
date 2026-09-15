@@ -1,12 +1,16 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-bg: #1e1f22;
-  --color-panel: #2b2d30;
-  --color-line: #393b40;
-  --color-fg: #dfe1e5;
-  --color-muted: #8b8f96;
-  --color-accent: #4d9eff;
+  --color-bg: #ffffff;
+  --color-panel: #f2f1f0;
+  --color-line: #d4d0c8;
+  --color-fg: #1a1a1a;
+  --color-muted: #6b6b6b;
+  --color-accent: #2a6099;
+  /* light needs an opaque selection; accent/15 on white is invisible */
+  --color-sel: #cfe3f7;
+  /* branch/tag decoration badges in the journal */
+  --color-ref: #2e7d32;
 }
 
 html,
@@ -16,8 +20,14 @@ body,
   margin: 0;
 }
 body {
-  background: var(--color-bg);
+  background: var(--color-panel);
   color: var(--color-fg);
   font: 13px/1.5 'Inter', system-ui, sans-serif;
   overflow: hidden;
+}
+
+/* Native-app density: thin scrollbars everywhere, like SmartGit's panes. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c2beb6 transparent;
 }

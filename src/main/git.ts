@@ -1,10 +1,28 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { EventEmitter } from 'node:events'
 
 const exec = promisify(execFile)
 
+/** One console line: every git invocation the app makes, success or not. */
+export type GitCmd = {
+  id: number
+  cwd: string
+  args: string[]
+  ms: number
+  ok: boolean
+  out: string
+  err: string
+}
+
+/** `git()` is the only place that shells out, so this sees 100% of commands. */
+export const bus = new EventEmitter<{ cmd: [GitCmd] }>()
+let cmdId = 0
+
 /** Raw git call. Returns stdout. Throws with stderr on non-zero exit. */
 export async function git(cwd: string, args: string[]): Promise<string> {
+  const id = ++cmdId
+  const t0 = Date.now()
   try {
     const { stdout } = await exec('git', args, {
       cwd,
@@ -13,9 +31,13 @@ export async function git(cwd: string, args: string[]): Promise<string> {
       // ponytail: no locale/pager surprises; add GIT_ASKPASS here if auth prompts show up
       env: { ...process.env, LC_ALL: 'C', GIT_PAGER: 'cat', GIT_OPTIONAL_LOCKS: '0' }
     })
+    // ponytail: 4 KB of stdout is enough to eyeball; full diffs have their own pane
+    bus.emit('cmd', { id, cwd, args, ms: Date.now() - t0, ok: true, out: stdout.slice(0, 4096), err: '' })
     return stdout
   } catch (e: any) {
-    throw new Error(e.stderr?.trim() || e.message)
+    const err = e.stderr?.trim() || e.message
+    bus.emit('cmd', { id, cwd, args, ms: Date.now() - t0, ok: false, out: '', err })
+    throw new Error(err)
   }
 }
 
@@ -107,13 +129,15 @@ export type Commit = {
 
 const LOG_FMT = ['%H', '%P', '%an', '%ae', '%aI', '%s', '%D'].join('%x1f') + '%x1e'
 
-export async function log(cwd: string, limit = 200, skip = 0): Promise<Commit[]> {
+export async function log(cwd: string, limit = 200, skip = 0, all = true): Promise<Commit[]> {
   const raw = await git(cwd, [
     'log',
     `--format=${LOG_FMT}`,
     `-n${limit}`,
     `--skip=${skip}`,
-    '--all'
+    // topo-order so the graph lanes stay contiguous instead of interleaving by date
+    '--topo-order',
+    ...(all ? ['--all'] : [])
   ])
   return raw
     .split('\x1e')
@@ -150,16 +174,91 @@ export const pull = (cwd: string, rebase = true) =>
 export const push = (cwd: string, force = false) =>
   git(cwd, ['push', ...(force ? ['--force-with-lease'] : [])])
 
-export const branches = async (cwd: string) =>
-  (await git(cwd, ['branch', '--format=%(refname:short)%09%(upstream:short)%09%(HEAD)', '-a']))
+export type Ref = {
+  kind: 'local' | 'remote' | 'tag'
+  /** short name: 'main', 'origin/main', 'v1.0' */
+  name: string
+  /** remote name for kind==='remote', else '' */
+  remote: string
+  upstream?: string
+  sha: string
+  current: boolean
+}
+
+const REF_FMT = ['%(refname)', '%(refname:short)', '%(upstream:short)', '%(objectname:short)', '%(HEAD)'].join('%09')
+
+/** All refs in one call, grouped by kind — `branch -a` can't tell a tag from a branch. */
+export async function refs(cwd: string): Promise<Ref[]> {
+  const raw = await git(cwd, [
+    'for-each-ref',
+    `--format=${REF_FMT}`,
+    'refs/heads',
+    'refs/remotes',
+    'refs/tags'
+  ])
+  const out: Ref[] = []
+  for (const line of raw.split('\n')) {
+    if (!line) continue
+    const [full, name, upstream, sha, head] = line.split('\t')
+    // origin/HEAD is a symref pointer, not a branch anyone checks out
+    if (name.endsWith('/HEAD')) continue
+    const kind = full.startsWith('refs/heads/')
+      ? 'local'
+      : full.startsWith('refs/tags/')
+        ? 'tag'
+        : 'remote'
+    out.push({
+      kind,
+      name,
+      remote: kind === 'remote' ? name.slice(0, name.indexOf('/')) : '',
+      upstream: upstream || undefined,
+      sha,
+      current: head === '*'
+    })
+  }
+  return out
+}
+
+export const checkout = (cwd: string, ref: string) => git(cwd, ['checkout', ref])
+
+export type Stash = { ref: string; subject: string }
+
+export async function stashList(cwd: string): Promise<Stash[]> {
+  const raw = await git(cwd, ['stash', 'list', '--format=%gd%x1f%s'])
+  return raw
     .split('\n')
     .filter(Boolean)
     .map((l) => {
-      const [name, upstream, head] = l.split('\t')
-      return { name, upstream: upstream || undefined, current: head === '*' }
+      const [ref, subject] = l.split('\x1f')
+      return { ref, subject }
     })
+}
 
-export const checkout = (cwd: string, ref: string) => git(cwd, ['checkout', ref])
+export const stashSave = (cwd: string, msg: string) =>
+  git(cwd, ['stash', 'push', '-u', ...(msg ? ['-m', msg] : [])])
+export const stashApply = (cwd: string, ref: string) => git(cwd, ['stash', 'apply', ref])
+export const stashDrop = (cwd: string, ref: string) => git(cwd, ['stash', 'drop', ref])
+
+/**
+ * Throw away worktree changes. Tracked paths are restored from the index,
+ * untracked ones deleted — `restore` alone silently no-ops on untracked files.
+ */
+export async function discard(cwd: string, paths: string[], untracked: string[] = []) {
+  if (paths.length) await git(cwd, ['restore', '--worktree', '--', ...paths])
+  if (untracked.length) await git(cwd, ['clean', '-fd', '--', ...untracked])
+  return ''
+}
+
+/** Cheap one-line summary for the repositories sidebar — no full status parse. */
+export async function repoBrief(cwd: string) {
+  const branch = (await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim()
+  const dirty = (await git(cwd, ['status', '--porcelain', '-uall'])).trim().length > 0
+  return { cwd, name: cwd.split('/').filter(Boolean).pop() ?? cwd, branch, dirty }
+}
+
+/** Full patch for one commit, for the Diff tab when a journal row is clicked. */
+export const showCommit = (cwd: string, sha: string) =>
+  git(cwd, ['show', '--stat', '--patch', '--format=fuller', sha])
 
 /** Remote URL -> which hosting provider, for the PR/MR panel later. */
 export async function remoteInfo(cwd: string) {

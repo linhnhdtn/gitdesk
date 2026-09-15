@@ -41,17 +41,28 @@ handle('repo:pick', async () => {
 })
 
 handle('git:status', (cwd: string) => G.status(cwd))
-handle('git:log', (cwd: string, limit: number, skip: number) => G.log(cwd, limit, skip))
+handle('git:log', (cwd: string, limit: number, skip: number, all: boolean) =>
+  G.log(cwd, limit, skip, all)
+)
 handle('git:diff', (cwd: string, path: string, staged: boolean) => G.diffFile(cwd, path, staged))
 handle('git:stage', (cwd: string, paths: string[]) => G.stage(cwd, paths))
 handle('git:unstage', (cwd: string, paths: string[]) => G.unstage(cwd, paths))
 handle('git:commit', (cwd: string, msg: string, amend: boolean) => G.commit(cwd, msg, amend))
 handle('git:fetch', (cwd: string) => G.fetch(cwd))
-handle('git:pull', (cwd: string) => G.pull(cwd))
+handle('git:pull', (cwd: string, rebase: boolean) => G.pull(cwd, rebase))
 handle('git:push', (cwd: string, force: boolean) => G.push(cwd, force))
-handle('git:branches', (cwd: string) => G.branches(cwd))
+handle('git:refs', (cwd: string) => G.refs(cwd))
 handle('git:checkout', (cwd: string, ref: string) => G.checkout(cwd, ref))
 handle('git:remote', (cwd: string) => G.remoteInfo(cwd))
+handle('git:discard', (cwd: string, paths: string[], untracked: string[]) =>
+  G.discard(cwd, paths, untracked)
+)
+handle('git:stashList', (cwd: string) => G.stashList(cwd))
+handle('git:stashSave', (cwd: string, msg: string) => G.stashSave(cwd, msg))
+handle('git:stashApply', (cwd: string, ref: string) => G.stashApply(cwd, ref))
+handle('git:stashDrop', (cwd: string, ref: string) => G.stashDrop(cwd, ref))
+handle('git:repoBrief', (cwd: string) => G.repoBrief(cwd))
+handle('git:showCommit', (cwd: string, sha: string) => G.showCommit(cwd, sha))
 
 handle('gh:saveToken', (t: string) => H.saveToken(t))
 handle('gh:hasToken', () => H.loadToken() !== null)
@@ -65,6 +76,9 @@ handle('gh:closePR', (o: string, r: string, n: number) => H.closePR(o, r, n))
 handle('gh:checks', (o: string, r: string, sha: string) => H.checks(o, r, sha))
 handle('gh:reviews', (o: string, r: string, n: number) => H.reviews(o, r, n))
 handle('sys:openExternal', (url: string) => shell.openExternal(url))
+
+// Single-window app, so no ref to keep and no listener to tear down on re-create.
+G.bus.on('cmd', (e) => BrowserWindow.getAllWindows()[0]?.webContents.send('git:cmd', e))
 
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())

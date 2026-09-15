@@ -6,18 +6,33 @@ const call = <T>(ch: string, ...a: unknown[]): Promise<Res<T>> => ipcRenderer.in
 export const api = {
   pickRepo: () => call<string | null>('repo:pick'),
   status: (cwd: string) => call<import('../main/git.ts').RepoStatus>('git:status', cwd),
-  log: (cwd: string, limit = 200, skip = 0) =>
-    call<import('../main/git.ts').Commit[]>('git:log', cwd, limit, skip),
+  log: (cwd: string, limit = 200, skip = 0, all = true) =>
+    call<import('../main/git.ts').Commit[]>('git:log', cwd, limit, skip, all),
   diff: (cwd: string, path: string, staged: boolean) => call<string>('git:diff', cwd, path, staged),
   stage: (cwd: string, paths: string[]) => call<string>('git:stage', cwd, paths),
   unstage: (cwd: string, paths: string[]) => call<string>('git:unstage', cwd, paths),
   commit: (cwd: string, msg: string, amend = false) => call<string>('git:commit', cwd, msg, amend),
   fetch: (cwd: string) => call<string>('git:fetch', cwd),
-  pull: (cwd: string) => call<string>('git:pull', cwd),
+  pull: (cwd: string, rebase = true) => call<string>('git:pull', cwd, rebase),
   push: (cwd: string, force = false) => call<string>('git:push', cwd, force),
-  branches: (cwd: string) =>
-    call<{ name: string; upstream?: string; current: boolean }[]>('git:branches', cwd),
+  refs: (cwd: string) => call<import('../main/git.ts').Ref[]>('git:refs', cwd),
   checkout: (cwd: string, ref: string) => call<string>('git:checkout', cwd, ref),
+  discard: (cwd: string, paths: string[], untracked: string[] = []) =>
+    call<string>('git:discard', cwd, paths, untracked),
+  stashList: (cwd: string) => call<import('../main/git.ts').Stash[]>('git:stashList', cwd),
+  stashSave: (cwd: string, msg = '') => call<string>('git:stashSave', cwd, msg),
+  stashApply: (cwd: string, ref: string) => call<string>('git:stashApply', cwd, ref),
+  stashDrop: (cwd: string, ref: string) => call<string>('git:stashDrop', cwd, ref),
+  repoBrief: (cwd: string) =>
+    call<{ cwd: string; name: string; branch: string; dirty: boolean }>('git:repoBrief', cwd),
+  showCommit: (cwd: string, sha: string) => call<string>('git:showCommit', cwd, sha),
+
+  /** Main->renderer push (the only one). Returns an unsubscribe for useEffect cleanup. */
+  onGitCmd: (cb: (e: import('../main/git.ts').GitCmd) => void) => {
+    const h = (_: unknown, e: import('../main/git.ts').GitCmd) => cb(e)
+    ipcRenderer.on('git:cmd', h)
+    return () => void ipcRenderer.off('git:cmd', h)
+  },
   // --- GitHub ---
   saveToken: (t: string) => call<{ encrypted: boolean }>('gh:saveToken', t),
   hasToken: () => call<boolean>('gh:hasToken'),

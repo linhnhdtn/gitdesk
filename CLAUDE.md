@@ -1,0 +1,111 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+pnpm dev                        # electron-vite dev, hot reload
+pnpm build                      # tsc --noEmit (typecheck) + bundle to out/
+pnpm test                       # node:test over src/*/*.test.ts
+pnpm pack                       # build + electron-builder → dist/ (.deb, AppImage)
+
+node --test src/main/git.test.ts                        # single file
+node --test --test-name-pattern 'rename' src/*/*.test.ts  # single test
+npx tsc --noEmit                                        # typecheck only
+```
+
+**`pnpm <script>` currently fails before running anything**: `pnpm-workspace.yaml` ships
+placeholder values (`electron: set this to true or false`) under `allowBuilds`, so pnpm's
+pre-run dependency check aborts with `ERR_PNPM_IGNORED_BUILDS`. Either fix that file
+(`true`) or bypass pnpm — `node --test src/*/*.test.ts`, `npx electron-vite dev`.
+
+The test glob is `src/**/*.test.ts`, but npm scripts run under `sh`, where `**` is just `*` —
+it only matches **one** directory level (`src/main/`, `src/shared/`). A test placed in
+`src/renderer/src/` will be silently skipped.
+
+Requires system `git` on PATH. No native modules, no Rust, no libgit2.
+
+## Architecture
+
+Electron three-process app. Node 22 runs the `.ts` sources directly (type stripping), so
+`tsconfig.json` sets `allowImportingTsExtensions` — **every relative import must carry its
+`.ts`/`.tsx` extension**.
+
+```
+src/main/     Node side. The only place that touches git or the network.
+src/preload/  contextBridge → window.api. contextIsolation on, sandbox off.
+src/renderer/ React 19 + Tailwind v4. No node access at all.
+src/shared/   Pure logic imported by both sides (currently check-run rollup).
+```
+
+### Adding a capability = four edits in lockstep
+
+1. `src/main/git.ts` or `src/main/github.ts` — the actual implementation
+2. `src/main/index.ts` — one `handle('namespace:verb', fn)` line
+3. `src/preload/index.ts` — one entry on the `api` object with the response type
+4. renderer — call it through `must(api.thing(...))`
+
+Skipping step 3 means the renderer sees `undefined`; there is no dynamic channel lookup.
+
+### The `{ok, data} | {ok, error}` envelope
+
+Nothing throws across IPC. `handle()` in `src/main/index.ts` catches every error and returns
+`{ ok: false, error: string }`; `must()` in `src/renderer/src/api.ts` unwraps and re-throws on
+the renderer side so UI code can `try/catch` once. Both `App.tsx` (`run`) and `PrDetail`
+(`act`) wrap calls in a busy/error helper that surfaces the message in a banner. Never add an
+`ipcMain.handle` directly — go through `handle()` or errors become renderer crashes.
+
+### Types cross the process boundary, code does not
+
+`preload/index.ts` and the renderer use `import type` against `src/main/git.ts` /
+`src/main/github.ts` (`RepoStatus`, `Commit`, `PR`, `Check`). These are erased at build time —
+never import a *value* from `src/main/` into the renderer.
+
+### Git layer
+
+All git goes through one `git(cwd, args)` in `src/main/git.ts` that shells out to the CLI with
+`LC_ALL=C`, `GIT_PAGER=cat`, `GIT_OPTIONAL_LOCKS=0` and a 64 MB buffer, and rethrows stderr as
+the error message. Add new git operations as thin wrappers here, not as ad-hoc `execFile` calls.
+
+`parseStatusV2` is the one piece of real parsing and the reason `git.test.ts` exists. It reads
+`status --porcelain=v2 -z --branch -uall`, where:
+- records are NUL-separated, so paths with spaces survive `line.split(' ')` only because the
+  path is reassembled with `f.slice(N).join(' ')`
+- a rename (`2`) entry's original path arrives as the **next NUL record**, consumed with `rec[++i]`
+
+`FileStatus.x` is the index/staged state, `.y` the worktree state. `App.tsx` derives its two
+panes from those codes (`x !== '.' && x !== '?' && x !== '!'` → staged; `y !== '.' ||
+untracked` → unstaged), so changing the parser's semantics changes the UI split.
+
+`push()` uses `--force-with-lease`, never bare `--force`.
+
+### GitHub layer
+
+`src/main/github.ts` wraps `fetch` against api.github.com with a PAT. Token is stored in
+`app.getPath('userData')/gh.token`, encrypted via Electron `safeStorage` (GNOME Keyring on
+Linux); with no keyring backend it falls back to a `0600` plaintext file and the Settings UI
+says so. `loadToken()` also falls back to plaintext on decrypt failure, for tokens written
+before a keyring existed.
+
+`remoteInfo()` in `git.ts` parses `origin` into `{owner, repo, provider}`; the PR panel renders
+only when `provider === 'github'`.
+
+### Renderer state model
+
+Single `App.tsx` owns repo path (persisted to `localStorage`), tab, status, log, selection and
+modals. There is **no filesystem watcher** — `refresh()` re-runs on window `focus`. The PR
+panel refetches via a `prKey` counter bumped by the ↻ button and by modal close; it is not
+driven by `refresh()`.
+
+Tailwind v4 with no config file — the palette (`bg`, `panel`, `line`, `fg`, `muted`, `accent`)
+is defined in `@theme` inside `src/renderer/src/index.css`.
+
+## Conventions
+
+`ponytail:` comments mark deliberate shortcuts with their known ceiling and upgrade path
+(focus-based refresh instead of a watcher; N check-run calls for N PRs). Keep that format when
+adding one.
+
+Non-trivial logic leaves one runnable `node:test` file behind — see `git.test.ts` and
+`checks.test.ts`. No test framework, no fixtures.
