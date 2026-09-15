@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Ref, Stash } from '../../../main/git.ts'
+import { Icon, C, type ListIcon } from './Icons.tsx'
 
 type Props = {
   refs: Ref[]
@@ -20,13 +21,12 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
         {local.map((r) => (
           <Row
             key={r.name}
+            icon="branch"
+            color={r.current ? C.green : undefined}
             onDoubleClick={() => !r.current && onCheckout(r.name)}
             title={`Double-click to check out ${r.name}`}
           >
-            <span className={r.current ? 'font-semibold text-accent' : ''}>
-              {r.current && '▶ '}
-              {r.name}
-            </span>
+            <span className={r.current ? 'font-semibold text-accent' : ''}>{r.name}</span>
             {r.upstream && <span className="text-muted"> = {r.upstream}</span>}
           </Row>
         ))}
@@ -39,6 +39,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
             {list.map((r) => (
               <Row
                 key={r.name}
+                icon="remote"
                 onDoubleClick={() => onCheckout(r.name.slice(rm.length + 1))}
                 title={`Double-click to check out ${r.name}`}
               >
@@ -52,7 +53,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
       {!!tags.length && (
         <Node title="Tags" count={tags.length}>
           {tags.map((r) => (
-            <Row key={r.name} onDoubleClick={() => onCheckout(r.name)}>
+            <Row key={r.name} icon="tag" color={C.orange} onDoubleClick={() => onCheckout(r.name)}>
               <span className="text-ref">{r.name}</span>
             </Row>
           ))}
@@ -61,7 +62,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
 
       <Node title="Stashes" count={stashes.length}>
         {stashes.map((s) => (
-          <Row key={s.ref} onDoubleClick={() => onStashApply(s.ref)} title="Double-click to apply">
+          <Row key={s.ref} icon="drawer" onDoubleClick={() => onStashApply(s.ref)} title="Double-click to apply">
             <span className="text-muted">{s.ref}</span> {s.subject}
             <button
               onClick={(e) => (e.stopPropagation(), onStashDrop(s.ref))}
@@ -104,10 +105,16 @@ function Node({
   )
 }
 
-function Row({ children, ...p }: React.HTMLAttributes<HTMLDivElement>) {
+function Row({
+  children,
+  icon,
+  color,
+  ...p
+}: React.HTMLAttributes<HTMLDivElement> & { icon: ListIcon; color?: string }) {
   return (
-    <div {...p} className="cursor-default truncate py-[2px] pr-2 pl-7 hover:bg-panel">
-      {children}
+    <div {...p} className="flex cursor-default items-center gap-1.5 py-[2px] pr-2 pl-6 hover:bg-panel">
+      <Icon name={icon} color={color} size={13} className="opacity-80" />
+      <span className="min-w-0 truncate">{children}</span>
     </div>
   )
 }

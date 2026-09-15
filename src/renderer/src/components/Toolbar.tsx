@@ -1,3 +1,5 @@
+import { Icon, type ToolbarIcon } from './Icons.tsx'
+
 /** SmartGit's icon strip. Each group is separated by a rule. */
 export function Toolbar({ groups }: { groups: Item[][] }) {
   return (
@@ -16,7 +18,7 @@ export function Toolbar({ groups }: { groups: Item[][] }) {
 
 export type Item = {
   label: string
-  icon: string
+  icon: ToolbarIcon
   onClick: () => void
   disabled?: boolean
   title?: string
@@ -30,11 +32,11 @@ function ToolBtn({ label, icon, onClick, disabled, title, badge, active }: Item)
       onClick={onClick}
       disabled={disabled}
       title={title ?? label}
-      className={`relative flex w-[58px] flex-col items-center justify-center rounded px-1 py-1 leading-tight hover:bg-line disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent ${
+      className={`relative flex w-[58px] flex-col items-center justify-center gap-0.5 rounded px-1 py-1 leading-tight hover:bg-line disabled:cursor-default disabled:opacity-35 disabled:grayscale disabled:hover:bg-transparent ${
         active ? 'bg-line' : ''
       }`}
     >
-      <span className="text-[17px]">{icon}</span>
+      <Icon name={icon} size={22} />
       <span className="w-full truncate text-[11px]">{label}</span>
       {badge != null && badge !== 0 && (
         <span className="absolute top-0.5 right-1.5 rounded-full bg-accent px-1 text-[9px] font-bold text-white">

@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { EventEmitter } from 'node:events'
+import { readFile } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
+import { newFilePatch } from '../shared/sidebyside.ts'
 
 const exec = promisify(execFile)
 
@@ -157,9 +160,29 @@ export async function log(cwd: string, limit = 200, skip = 0, all = true): Promi
     })
 }
 
-/** Unified diff for one file. staged=true diffs index vs HEAD. */
-export function diffFile(cwd: string, path: string, staged: boolean): Promise<string> {
-  return git(cwd, ['diff', ...(staged ? ['--cached'] : []), '--', path])
+/**
+ * Unified diff for one file. staged=true diffs index vs HEAD.
+ * `context` is git's -U: the side-by-side view asks for a huge one so the whole
+ * file comes back as a single hunk — git does the diffing, we only split sides.
+ */
+export function diffFile(cwd: string, path: string, staged: boolean, context = 3): Promise<string> {
+  return git(cwd, ['diff', `-U${context}`, ...(staged ? ['--cached'] : []), '--', path])
+}
+
+/**
+ * Untracked files are not in the object database, so `git diff` has nothing to
+ * show. Read them off disk instead, refusing anything outside the repo — the
+ * path crosses an IPC boundary, so it gets checked rather than trusted.
+ */
+export async function diffNew(cwd: string, path: string): Promise<string> {
+  return newFilePatch(path, await readWorktree(cwd, path))
+}
+
+export async function readWorktree(cwd: string, path: string): Promise<string> {
+  const root = resolve(cwd)
+  const full = resolve(root, path)
+  if (full !== root && !full.startsWith(root + sep)) throw new Error(`path escapes repo: ${path}`)
+  return readFile(full, 'utf8')
 }
 
 export const stage = (cwd: string, paths: string[]) => git(cwd, ['add', '--', ...paths])

@@ -8,7 +8,11 @@ export const api = {
   status: (cwd: string) => call<import('../main/git.ts').RepoStatus>('git:status', cwd),
   log: (cwd: string, limit = 200, skip = 0, all = true) =>
     call<import('../main/git.ts').Commit[]>('git:log', cwd, limit, skip, all),
-  diff: (cwd: string, path: string, staged: boolean) => call<string>('git:diff', cwd, path, staged),
+  diff: (cwd: string, path: string, staged: boolean, context = 3) =>
+    call<string>('git:diff', cwd, path, staged, context),
+  readWorktree: (cwd: string, path: string) => call<string>('git:readWorktree', cwd, path),
+  /** Untracked files need a synthesised patch — `git diff` returns nothing for them. */
+  diffNew: (cwd: string, path: string) => call<string>('git:diffNew', cwd, path),
   stage: (cwd: string, paths: string[]) => call<string>('git:stage', cwd, paths),
   unstage: (cwd: string, paths: string[]) => call<string>('git:unstage', cwd, paths),
   commit: (cwd: string, msg: string, amend = false) => call<string>('git:commit', cwd, msg, amend),

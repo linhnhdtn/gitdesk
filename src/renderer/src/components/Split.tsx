@@ -6,16 +6,13 @@ export function Split({
   value,
   onChange,
   min = 120,
-  max = 900,
-  /** -1 when the pane being sized is on the far side of the handle */
-  sign = 1
+  max = 900
 }: {
   dir: 'x' | 'y'
   value: number
   onChange: (n: number) => void
   min?: number
   max?: number
-  sign?: 1 | -1
 }) {
   const down = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -26,7 +23,7 @@ export function Split({
       const base = value
       const move = (ev: PointerEvent) => {
         const now = dir === 'x' ? ev.clientX : ev.clientY
-        onChange(Math.min(max, Math.max(min, base + (now - start) * sign)))
+        onChange(Math.min(max, Math.max(min, base + (now - start))))
       }
       const up = () => {
         el.releasePointerCapture(e.pointerId)
@@ -36,7 +33,7 @@ export function Split({
       el.addEventListener('pointermove', move)
       el.addEventListener('pointerup', up)
     },
-    [dir, value, onChange, min, max, sign]
+    [dir, value, onChange, min, max]
   )
 
   return (

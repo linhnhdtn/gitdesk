@@ -1,3 +1,5 @@
+import { Icon } from './Icons.tsx'
+
 export type Brief = { cwd: string; name: string; branch: string; dirty: boolean }
 
 export function Repositories({
@@ -30,7 +32,7 @@ export function Repositories({
               active ? 'bg-sel' : 'hover:bg-panel'
             }`}
           >
-            <span className="shrink-0 text-muted">🗀</span>
+            <Icon name="repo" size={14} />
             <span className={`truncate ${active ? 'font-semibold' : ''}`}>
               {b?.name ?? p.split('/').pop()}
             </span>

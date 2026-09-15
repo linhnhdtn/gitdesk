@@ -1,4 +1,5 @@
 import type { FileStatus } from '../../../main/git.ts'
+import { Icon, C } from './Icons.tsx'
 
 /** porcelain-v2 x/y codes -> the words SmartGit puts in its State column. */
 const WORD: Record<string, string> = {
@@ -22,18 +23,29 @@ export function state(f: FileStatus): string {
 }
 
 export const isStaged = (f: FileStatus) => f.x !== '.' && f.x !== '?' && f.x !== '!'
+
+/** The file glyph carries the state as colour, the way SmartGit's list does. */
+export function stateColor(f: FileStatus): string {
+  if (f.kind === 'unmerged') return C.orange
+  if (f.kind === 'untracked') return C.blue
+  if (f.kind === 'ignored') return C.grey
+  if (f.y !== '.') return C.red // dirty in the worktree
+  return C.green // staged and clean on disk
+}
 const dir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const base = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
 export function Files({
   files,
   sel,
-  onSelect
+  onSelect,
+  onCompare
 }: {
   files: FileStatus[]
   sel: Set<string>
   /** ctrl/meta held -> extend the selection instead of replacing it */
   onSelect: (path: string, extend: boolean) => void
+  onCompare: (f: FileStatus) => void
 }) {
   if (!files.length) return <div className="p-2 text-muted">Working tree clean</div>
 
@@ -54,12 +66,15 @@ export function Files({
             <tr
               key={f.path}
               onClick={(e) => onSelect(f.path, e.ctrlKey || e.metaKey)}
-              title={f.origPath ? `${f.origPath} → ${f.path}` : f.path}
+              onDoubleClick={() => onCompare(f)}
+              title={`${f.origPath ? `${f.origPath} → ` : ''}${f.path}\nDouble-click to compare`}
               className={`cursor-default ${on ? 'bg-sel' : 'hover:bg-panel'}`}
             >
               <Td className={conflict ? 'text-rose-700' : ''}>
-                <span className="mr-1">{isStaged(f) ? '✓' : f.kind === 'untracked' ? '?' : '•'}</span>
-                {base(f.path)}
+                <span className="flex items-center gap-1.5">
+                  <Icon name="file" color={stateColor(f)} size={14} />
+                  <span className="truncate">{base(f.path)}</span>
+                </span>
               </Td>
               <Td className={conflict ? 'font-medium text-rose-700' : 'text-muted'}>{state(f)}</Td>
               <Td className="text-muted">{dir(f.path)}</Td>

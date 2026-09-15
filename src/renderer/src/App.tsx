@@ -10,16 +10,20 @@ import { Branches } from './components/Branches.tsx'
 import { Files, isStaged } from './components/Files.tsx'
 import { Journal } from './components/Journal.tsx'
 import { Console } from './components/Console.tsx'
-import type { RepoStatus, Commit, Ref, Stash, GitCmd } from '../../main/git.ts'
+import { Tabs } from './components/Tabs.tsx'
+import { FileCompare } from './components/FileCompare.tsx'
+import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 import type { PR } from '../../main/github.ts'
 
 const STORE_KEY = 'gitdesk.repo'
 const LIST_KEY = 'gitdesk.repos'
 const LAYOUT_KEY = 'gitdesk.layout'
-type BottomTab = 'journal' | 'diff' | 'prs'
-type Layout = { left: number; repos: number; files: number; console: number }
+const TABS_KEY = 'gitdesk.tabs'
+type BottomTab = 'journal' | 'diff' | 'prs' | 'console'
+const TABS: BottomTab[] = ['journal', 'diff', 'prs', 'console']
+type Layout = { left: number; repos: number; files: number }
 
-const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240, console: 0 }
+const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -46,12 +50,19 @@ export default function App() {
   const [commitSel, setCommitSel] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [bottom, setBottom] = useState<BottomTab>('journal')
+  const [tabOrder, setTabOrder] = useState<BottomTab[]>(() => {
+    // A saved order from an older build can name a tab that is gone or miss a
+    // new one, so reconcile against TABS rather than trusting it outright.
+    const saved = read<BottomTab[]>(TABS_KEY, [])
+    return [...saved.filter((t) => TABS.includes(t)), ...TABS.filter((t) => !saved.includes(t))]
+  })
 
   const [pr, setPr] = useState<PR | null>(null)
   const [prKey, setPrKey] = useState(0)
   const [diff, setDiff] = useState('')
   const [msg, setMsg] = useState('')
   const [modal, setModal] = useState<'settings' | 'createPr' | null>(null)
+  const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -73,6 +84,7 @@ export default function App() {
 
   useEffect(() => localStorage.setItem(LIST_KEY, JSON.stringify(repos)), [repos])
   useEffect(() => localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)), [layout])
+  useEffect(() => localStorage.setItem(TABS_KEY, JSON.stringify(tabOrder)), [tabOrder])
 
   const refreshBriefs = useCallback(async () => {
     const list = await Promise.all(
@@ -106,6 +118,7 @@ export default function App() {
     setSel(new Set())
     setCommitSel(null)
     setPr(null)
+    setCompare(null)
     run(refresh)
   }, [cwd, refresh, run])
 
@@ -123,7 +136,7 @@ export default function App() {
     const h = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === '`') {
         e.preventDefault()
-        setLayout((l) => ({ ...l, console: l.console ? 0 : 180 }))
+        setBottom((b) => (b === 'console' ? 'journal' : 'console'))
       }
     }
     window.addEventListener('keydown', h)
@@ -142,7 +155,13 @@ export default function App() {
     if (!cwd) return
     const one = picked.length === 1 ? picked[0] : null
     if (!one) return setDiff('')
-    run(async () => setDiff(await must(api.diff(cwd, one.path, one.y === '.'))))
+    run(async () =>
+      setDiff(
+        one.kind === 'untracked'
+          ? await must(api.diffNew(cwd, one.path))
+          : await must(api.diff(cwd, one.path, one.y === '.'))
+      )
+    )
   }, [cwd, picked, run])
 
   if (!cwd && !repos.length)
@@ -175,18 +194,18 @@ export default function App() {
 
   const groups: Item[][] = [
     [
-      { label: 'Fetch', icon: '⟳', onClick: at((c) => must(api.fetch(c))), disabled: busy },
-      { label: 'Pull', icon: '⭳', onClick: at((c) => must(api.pull(c))), disabled: busy },
+      { label: 'Fetch', icon: 'fetch', onClick: at((c) => must(api.fetch(c))), disabled: busy },
+      { label: 'Pull', icon: 'pull', onClick: at((c) => must(api.pull(c))), disabled: busy },
       {
         label: 'Push',
-        icon: '⭱',
+        icon: 'push',
         onClick: at((c) => must(api.push(c))),
         disabled: busy,
         badge: st?.ahead
       },
       {
         label: 'Commit',
-        icon: '✓',
+        icon: 'commit',
         onClick: () => setBottom('diff'),
         disabled: !staged.length,
         badge: staged.length,
@@ -196,19 +215,19 @@ export default function App() {
     [
       {
         label: 'Stage',
-        icon: '＋',
+        icon: 'stage',
         disabled: busy || !picked.length,
         onClick: at((c) => must(api.stage(c, picked.map((f) => f.path))))
       },
       {
         label: 'Unstage',
-        icon: '－',
+        icon: 'unstage',
         disabled: busy || !picked.length,
         onClick: at((c) => must(api.unstage(c, picked.map((f) => f.path))))
       },
       {
         label: 'Discard',
-        icon: '⌫',
+        icon: 'discard',
         disabled: busy || !picked.length,
         title: 'Throw away worktree changes in the selected files',
         onClick: () => {
@@ -225,13 +244,13 @@ export default function App() {
     [
       {
         label: 'Stash',
-        icon: '🗃',
+        icon: 'stash',
         disabled: busy || !st?.files.length,
         onClick: at((c) => must(api.stashSave(c, msg)))
       },
       {
         label: 'Apply',
-        icon: '🗂',
+        icon: 'apply',
         disabled: busy || !stashes.length,
         onClick: at((c) => must(api.stashApply(c, stashes[0].ref))),
         title: stashes[0] ? `Apply ${stashes[0].ref}` : 'No stashes'
@@ -240,12 +259,13 @@ export default function App() {
     [
       {
         label: 'Console',
-        icon: '▣',
-        active: layout.console > 0,
-        onClick: () => setLayout((l) => ({ ...l, console: l.console ? 0 : 180 })),
-        title: 'Toggle command console (Ctrl+`)'
+        icon: 'console',
+        active: bottom === 'console',
+        badge: cmds.length,
+        onClick: () => setBottom((b) => (b === 'console' ? 'journal' : 'console')),
+        title: 'Command console (Ctrl+`)'
       },
-      { label: 'Settings', icon: '⚙', onClick: () => setModal('settings') }
+      { label: 'Settings', icon: 'settings', onClick: () => setModal('settings') }
     ]
   ]
 
@@ -322,6 +342,9 @@ export default function App() {
               <Files
                 files={files}
                 sel={sel}
+                // Only the worktree half has something to compare when both are dirty;
+                // a purely staged file compares HEAD against the index instead.
+                onCompare={(f) => setCompare({ file: f, staged: f.y === '.' && f.kind !== 'untracked' })}
                 onSelect={(p, extend) =>
                   setSel((s) => {
                     if (!extend) return new Set([p])
@@ -355,28 +378,39 @@ export default function App() {
 
           <Pane
             title={
-              <div className="-mx-2 flex">
-                {(['journal', 'diff', 'prs'] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setBottom(t)}
-                    className={`px-3 capitalize ${
-                      bottom === t ? 'border-b-2 border-accent font-semibold' : 'text-muted hover:text-fg'
-                    }`}
-                  >
+              <Tabs
+                tabs={tabOrder}
+                active={bottom}
+                onSelect={setBottom}
+                onReorder={setTabOrder}
+                label={(t) => (
+                  <>
                     {t === 'prs' ? 'Pull Requests' : t}
-                  </button>
-                ))}
-              </div>
+                    {t === 'console' && !!cmds.length && (
+                      <span className="ml-1 font-normal text-muted">{cmds.length}</span>
+                    )}
+                  </>
+                )}
+              />
             }
             right={
-              <button
-                onClick={() => (run(refresh), setPrKey((k) => k + 1))}
-                className="rounded px-1.5 hover:bg-line"
-                title="Refresh"
-              >
-                ↻
-              </button>
+              bottom === 'console' ? (
+                <button
+                  onClick={() => setCmds([])}
+                  className="rounded px-1.5 text-muted hover:bg-line hover:text-fg"
+                  title="Clear the command log"
+                >
+                  clear
+                </button>
+              ) : (
+                <button
+                  onClick={() => (run(refresh), setPrKey((k) => k + 1))}
+                  className="rounded px-1.5 hover:bg-line"
+                  title="Refresh"
+                >
+                  ↻
+                </button>
+              )
             }
             className="min-h-0 flex-1"
           >
@@ -395,6 +429,7 @@ export default function App() {
             )}
             {bottom === 'diff' &&
               (diff ? <Diff text={diff} /> : <Empty>Select a file or a commit</Empty>)}
+            {bottom === 'console' && <Console cmds={cmds} />}
             {bottom === 'prs' &&
               (pr && repo ? (
                 <PrDetail pr={pr} repo={repo} onDone={() => (setPr(null), setPrKey((k) => k + 1))} />
@@ -411,24 +446,13 @@ export default function App() {
         </div>
       </div>
 
-      {layout.console > 0 && (
-        <>
-          <Split
-            dir="y"
-            sign={-1}
-            value={layout.console}
-            min={60}
-            max={600}
-            onChange={(n) => setLayout((l) => ({ ...l, console: n }))}
-          />
-          <div style={{ height: layout.console }} className="flex shrink-0 flex-col">
-            <Console
-              cmds={cmds}
-              onClear={() => setCmds([])}
-              onClose={() => setLayout((l) => ({ ...l, console: 0 }))}
-            />
-          </div>
-        </>
+      {compare && cwd && (
+        <FileCompare
+          cwd={cwd}
+          file={compare.file}
+          staged={compare.staged}
+          onClose={() => setCompare(null)}
+        />
       )}
 
       {modal === 'settings' && <Settings onClose={() => (setModal(null), setPrKey((k) => k + 1))} />}

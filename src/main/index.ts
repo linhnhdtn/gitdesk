@@ -44,7 +44,11 @@ handle('git:status', (cwd: string) => G.status(cwd))
 handle('git:log', (cwd: string, limit: number, skip: number, all: boolean) =>
   G.log(cwd, limit, skip, all)
 )
-handle('git:diff', (cwd: string, path: string, staged: boolean) => G.diffFile(cwd, path, staged))
+handle('git:diff', (cwd: string, path: string, staged: boolean, context: number) =>
+  G.diffFile(cwd, path, staged, context)
+)
+handle('git:readWorktree', (cwd: string, path: string) => G.readWorktree(cwd, path))
+handle('git:diffNew', (cwd: string, path: string) => G.diffNew(cwd, path))
 handle('git:stage', (cwd: string, paths: string[]) => G.stage(cwd, paths))
 handle('git:unstage', (cwd: string, paths: string[]) => G.unstage(cwd, paths))
 handle('git:commit', (cwd: string, msg: string, amend: boolean) => G.commit(cwd, msg, amend))
