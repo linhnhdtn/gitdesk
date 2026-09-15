@@ -1,0 +1,7 @@
+appId: vn.com.dtn.gitdesk
+productName: GitDesk
+directories: { output: dist, buildResources: build }
+files: ['out/**/*', 'package.json']
+linux:
+  target: [deb, AppImage]
+  category: Development

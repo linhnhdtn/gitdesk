@@ -1,0 +1,71 @@
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { join } from 'node:path'
+import * as G from './git.ts'
+import * as H from './github.ts'
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: { preload: join(import.meta.dirname, '../preload/index.mjs'), sandbox: false }
+  })
+  win.on('ready-to-show', () => win.show())
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
+}
+
+/** Every git call is funnelled through here so errors reach the UI as strings, not crashes. */
+function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R) {
+  ipcMain.handle(channel, async (_e, ...args) => {
+    try {
+      return { ok: true as const, data: await fn(...(args as A)) }
+    } catch (e: any) {
+      return { ok: false as const, error: String(e.message ?? e) }
+    }
+  })
+}
+
+handle('repo:pick', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+  if (r.canceled) return null
+  const cwd = r.filePaths[0]
+  await G.git(cwd, ['rev-parse', '--git-dir']) // throws if not a repo
+  return cwd
+})
+
+handle('git:status', (cwd: string) => G.status(cwd))
+handle('git:log', (cwd: string, limit: number, skip: number) => G.log(cwd, limit, skip))
+handle('git:diff', (cwd: string, path: string, staged: boolean) => G.diffFile(cwd, path, staged))
+handle('git:stage', (cwd: string, paths: string[]) => G.stage(cwd, paths))
+handle('git:unstage', (cwd: string, paths: string[]) => G.unstage(cwd, paths))
+handle('git:commit', (cwd: string, msg: string, amend: boolean) => G.commit(cwd, msg, amend))
+handle('git:fetch', (cwd: string) => G.fetch(cwd))
+handle('git:pull', (cwd: string) => G.pull(cwd))
+handle('git:push', (cwd: string, force: boolean) => G.push(cwd, force))
+handle('git:branches', (cwd: string) => G.branches(cwd))
+handle('git:checkout', (cwd: string, ref: string) => G.checkout(cwd, ref))
+handle('git:remote', (cwd: string) => G.remoteInfo(cwd))
+
+handle('gh:saveToken', (t: string) => H.saveToken(t))
+handle('gh:hasToken', () => H.loadToken() !== null)
+handle('gh:clearToken', () => H.clearToken())
+handle('gh:whoami', () => H.whoami())
+handle('gh:prs', (o: string, r: string) => H.listPRs(o, r))
+handle('gh:defaultBranch', (o: string, r: string) => H.defaultBranch(o, r))
+handle('gh:createPR', (o: string, r: string, b: Parameters<typeof H.createPR>[2]) => H.createPR(o, r, b))
+handle('gh:mergePR', (o: string, r: string, n: number, m: 'merge' | 'squash' | 'rebase') => H.mergePR(o, r, n, m))
+handle('gh:closePR', (o: string, r: string, n: number) => H.closePR(o, r, n))
+handle('gh:checks', (o: string, r: string, sha: string) => H.checks(o, r, sha))
+handle('gh:reviews', (o: string, r: string, n: number) => H.reviews(o, r, n))
+handle('sys:openExternal', (url: string) => shell.openExternal(url))
+
+app.whenReady().then(createWindow)
+app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())

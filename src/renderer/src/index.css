@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #1e1f22;
+  --color-panel: #2b2d30;
+  --color-line: #393b40;
+  --color-fg: #dfe1e5;
+  --color-muted: #8b8f96;
+  --color-accent: #4d9eff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: 13px/1.5 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+}
