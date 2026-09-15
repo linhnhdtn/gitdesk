@@ -7,11 +7,14 @@ import { Split, Pane } from './components/Split.tsx'
 import { Toolbar, type Item } from './components/Toolbar.tsx'
 import { Repositories, type Brief } from './components/Repositories.tsx'
 import { Branches } from './components/Branches.tsx'
-import { Files, isStaged } from './components/Files.tsx'
+import { Files } from './components/Files.tsx'
+import { FileFilters } from './components/FileFilters.tsx'
+import { isStaged, category, counts as tally, type Category } from '../../shared/filestate.ts'
 import { Journal } from './components/Journal.tsx'
 import { Console } from './components/Console.tsx'
 import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
+import { CommitDialog } from './components/CommitDialog.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 import type { PR } from '../../main/github.ts'
 
@@ -19,6 +22,7 @@ const STORE_KEY = 'gitdesk.repo'
 const LIST_KEY = 'gitdesk.repos'
 const LAYOUT_KEY = 'gitdesk.layout'
 const TABS_KEY = 'gitdesk.tabs'
+const HIDE_KEY = 'gitdesk.hidden'
 type BottomTab = 'journal' | 'diff' | 'prs' | 'console'
 const TABS: BottomTab[] = ['journal', 'diff', 'prs', 'console']
 type Layout = { left: number; repos: number; files: number }
@@ -49,6 +53,7 @@ export default function App() {
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [commitSel, setCommitSel] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [hidden, setHidden] = useState<Set<Category>>(() => new Set(read<Category[]>(HIDE_KEY, [])))
   const [bottom, setBottom] = useState<BottomTab>('journal')
   const [tabOrder, setTabOrder] = useState<BottomTab[]>(() => {
     // A saved order from an older build can name a tab that is gone or miss a
@@ -60,8 +65,7 @@ export default function App() {
   const [pr, setPr] = useState<PR | null>(null)
   const [prKey, setPrKey] = useState(0)
   const [diff, setDiff] = useState('')
-  const [msg, setMsg] = useState('')
-  const [modal, setModal] = useState<'settings' | 'createPr' | null>(null)
+  const [modal, setModal] = useState<'settings' | 'createPr' | 'commit' | null>(null)
   const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
   const [busy, setBusy] = useState(false)
@@ -85,6 +89,7 @@ export default function App() {
   useEffect(() => localStorage.setItem(LIST_KEY, JSON.stringify(repos)), [repos])
   useEffect(() => localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)), [layout])
   useEffect(() => localStorage.setItem(TABS_KEY, JSON.stringify(tabOrder)), [tabOrder])
+  useEffect(() => localStorage.setItem(HIDE_KEY, JSON.stringify([...hidden])), [hidden])
 
   const refreshBriefs = useCallback(async () => {
     const list = await Promise.all(
@@ -144,10 +149,19 @@ export default function App() {
   }, [])
 
   const files = useMemo(
-    () => (st?.files ?? []).filter((f) => !filter || f.path.toLowerCase().includes(filter.toLowerCase())),
-    [st, filter]
+    () =>
+      (st?.files ?? []).filter(
+        (f) =>
+          !hidden.has(category(f)) &&
+          (!filter || f.path.toLowerCase().includes(filter.toLowerCase()))
+      ),
+    [st, filter, hidden]
   )
-  const picked = useMemo(() => (st?.files ?? []).filter((f) => sel.has(f.path)), [st, sel])
+  const catCounts = useMemo(() => tally(st?.files ?? []), [st])
+  const nHidden = (st?.files.length ?? 0) - files.length
+  // Only what is on screen can be staged or discarded — a hidden or filtered-out
+  // file must never be acted on from a selection the user can no longer see.
+  const picked = useMemo(() => files.filter((f) => sel.has(f.path)), [files, sel])
   const staged = useMemo(() => (st?.files ?? []).filter(isStaged), [st])
 
   // Diff follows the single-file selection; a commit selection wins the tab.
@@ -206,10 +220,10 @@ export default function App() {
       {
         label: 'Commit',
         icon: 'commit',
-        onClick: () => setBottom('diff'),
-        disabled: !staged.length,
+        onClick: () => setModal('commit'),
+        disabled: busy || !st?.files.length,
         badge: staged.length,
-        title: 'Staged files are committed from the box below the file list'
+        title: 'Commit staged or local changes…'
       }
     ],
     [
@@ -246,7 +260,7 @@ export default function App() {
         label: 'Stash',
         icon: 'stash',
         disabled: busy || !st?.files.length,
-        onClick: at((c) => must(api.stashSave(c, msg)))
+        onClick: at((c) => must(api.stashSave(c)))
       },
       {
         label: 'Apply',
@@ -274,9 +288,12 @@ export default function App() {
       <Toolbar groups={groups} />
 
       {err && (
-        <div className="shrink-0 border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[12px] text-rose-700">
+        // git errors are multi-line (its `hint:` lines usually carry the fix), and
+        // a plain div collapses them into one run-on line. pre keeps them; the cap
+        // stops a long one from eating the panes.
+        <pre className="max-h-32 shrink-0 overflow-auto border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[12px] whitespace-pre-wrap text-rose-700">
           {err}
-        </div>
+        </pre>
       )}
 
       <div className="flex min-h-0 flex-1">
@@ -330,12 +347,26 @@ export default function App() {
                 </>
               }
               right={
-                <input
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  placeholder="🔍 File Filter"
-                  className="w-48 rounded border border-line bg-bg px-1.5 py-0.5 outline-none focus:border-accent"
-                />
+                <>
+                  {!!nHidden && <span className="text-muted">{nHidden} hidden</span>}
+                  <input
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder="🔍 File Filter"
+                    className="w-40 rounded border border-line bg-bg px-1.5 py-0.5 outline-none focus:border-accent"
+                  />
+                  <FileFilters
+                    hidden={hidden}
+                    counts={catCounts}
+                    onToggle={(c) =>
+                      setHidden((h) => {
+                        const n = new Set(h)
+                        n.has(c) ? n.delete(c) : n.add(c)
+                        return n
+                      })
+                    }
+                  />
+                </>
               }
               className="min-h-0 flex-1"
             >
@@ -355,23 +386,6 @@ export default function App() {
                 }
               />
             </Pane>
-            <div className="flex shrink-0 gap-2 border-t border-line bg-panel p-1.5">
-              <input
-                value={msg}
-                onChange={(e) => setMsg(e.target.value)}
-                placeholder="Commit message"
-                className="min-w-0 flex-1 rounded border border-line bg-bg px-2 py-1 outline-none focus:border-accent"
-              />
-              <button
-                disabled={!msg.trim() || !staged.length || busy}
-                onClick={() =>
-                  act(async () => (await must(api.commit(cwd!, msg)), setMsg(''), setSel(new Set())))
-                }
-                className="shrink-0 rounded border border-line bg-bg px-3 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:text-fg"
-              >
-                Commit {staged.length || ''}
-              </button>
-            </div>
           </div>
 
           <Split dir="y" value={layout.files} min={100} max={800} onChange={(n) => setLayout((l) => ({ ...l, files: n }))} />
@@ -452,6 +466,15 @@ export default function App() {
           file={compare.file}
           staged={compare.staged}
           onClose={() => setCompare(null)}
+        />
+      )}
+
+      {modal === 'commit' && cwd && st && (
+        <CommitDialog
+          cwd={cwd}
+          files={st.files}
+          onClose={() => setModal(null)}
+          onDone={() => (setModal(null), setSel(new Set()), act(async () => {}))}
         />
       )}
 

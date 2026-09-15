@@ -1,37 +1,8 @@
 import type { FileStatus } from '../../../main/git.ts'
-import { Icon, C } from './Icons.tsx'
+import { Icon } from './Icons.tsx'
+import { CATEGORY_COLOR } from './FileFilters.tsx'
+import { category, state } from '../../../shared/filestate.ts'
 
-/** porcelain-v2 x/y codes -> the words SmartGit puts in its State column. */
-const WORD: Record<string, string> = {
-  M: 'Modified',
-  T: 'Type Changed',
-  A: 'Added',
-  D: 'Deleted',
-  R: 'Renamed',
-  C: 'Copied',
-  U: 'Conflict'
-}
-
-export function state(f: FileStatus): string {
-  if (f.kind === 'untracked') return 'Untracked'
-  if (f.kind === 'ignored') return 'Ignored'
-  if (f.kind === 'unmerged') return 'Conflict'
-  const parts: string[] = []
-  if (f.x !== '.') parts.push(`Staged ${WORD[f.x] ?? f.x}`)
-  if (f.y !== '.') parts.push(WORD[f.y] ?? f.y)
-  return parts.join(', ') || 'Unchanged'
-}
-
-export const isStaged = (f: FileStatus) => f.x !== '.' && f.x !== '?' && f.x !== '!'
-
-/** The file glyph carries the state as colour, the way SmartGit's list does. */
-export function stateColor(f: FileStatus): string {
-  if (f.kind === 'unmerged') return C.orange
-  if (f.kind === 'untracked') return C.blue
-  if (f.kind === 'ignored') return C.grey
-  if (f.y !== '.') return C.red // dirty in the worktree
-  return C.green // staged and clean on disk
-}
 const dir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const base = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
@@ -72,7 +43,7 @@ export function Files({
             >
               <Td className={conflict ? 'text-rose-700' : ''}>
                 <span className="flex items-center gap-1.5">
-                  <Icon name="file" color={stateColor(f)} size={14} />
+                  <Icon name="file" color={CATEGORY_COLOR[category(f)]} size={14} />
                   <span className="truncate">{base(f.path)}</span>
                 </span>
               </Td>

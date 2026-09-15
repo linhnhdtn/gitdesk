@@ -15,7 +15,9 @@ export const api = {
   diffNew: (cwd: string, path: string) => call<string>('git:diffNew', cwd, path),
   stage: (cwd: string, paths: string[]) => call<string>('git:stage', cwd, paths),
   unstage: (cwd: string, paths: string[]) => call<string>('git:unstage', cwd, paths),
-  commit: (cwd: string, msg: string, amend = false) => call<string>('git:commit', cwd, msg, amend),
+  commit: (cwd: string, msg: string, opts: import('../main/git.ts').CommitOpts = {}) =>
+    call<string>('git:commit', cwd, msg, opts),
+  lastMessage: (cwd: string) => call<string>('git:lastMessage', cwd),
   fetch: (cwd: string) => call<string>('git:fetch', cwd),
   pull: (cwd: string, rebase = true) => call<string>('git:pull', cwd, rebase),
   push: (cwd: string, force = false) => call<string>('git:push', cwd, force),

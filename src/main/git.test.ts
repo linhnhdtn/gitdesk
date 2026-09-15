@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseStatusV2 } from './git.ts'
+import { parseStatusV2, commitArgs } from './git.ts'
 
 // -z output: records joined by NUL. Rename entries put origPath in the NEXT record.
 const sample = [
@@ -59,4 +59,32 @@ test('clean repo', () => {
   const s = parseStatusV2('# branch.head main\0')
   assert.equal(s.files.length, 0)
   assert.equal(s.ahead, 0)
+})
+
+test('commitArgs: no options is a plain index commit', () => {
+  assert.deepEqual(commitArgs('hello'), ['commit', '-m', 'hello'])
+})
+
+test('commitArgs: flags come before -m, paths after a -- terminator', () => {
+  assert.deepEqual(commitArgs('m', { amend: true, signoff: true, noVerify: true, paths: ['a', 'b'] }), [
+    'commit',
+    '--amend',
+    '--signoff',
+    '--no-verify',
+    '-m',
+    'm',
+    '--',
+    'a',
+    'b'
+  ])
+})
+
+test('commitArgs: an empty path list still commits the index, not nothing', () => {
+  assert.deepEqual(commitArgs('m', { paths: [] }), ['commit', '-m', 'm'])
+})
+
+test('commitArgs: a path that looks like a flag stays a path', () => {
+  // it sits after --, so git cannot read it as an option
+  const a = commitArgs('m', { paths: ['--amend'] })
+  assert.equal(a.indexOf('--amend'), a.indexOf('--') + 1)
 })

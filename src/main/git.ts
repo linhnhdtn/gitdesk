@@ -188,8 +188,40 @@ export async function readWorktree(cwd: string, path: string): Promise<string> {
 export const stage = (cwd: string, paths: string[]) => git(cwd, ['add', '--', ...paths])
 export const unstage = (cwd: string, paths: string[]) =>
   git(cwd, ['restore', '--staged', '--', ...paths])
-export const commit = (cwd: string, message: string, amend = false) =>
-  git(cwd, ['commit', ...(amend ? ['--amend'] : []), '-m', message])
+export type CommitOpts = {
+  amend?: boolean
+  signoff?: boolean
+  noVerify?: boolean
+  /**
+   * Empty commits the index exactly as staged. With paths, git records the
+   * WORKING TREE content of those paths and ignores what is staged for them —
+   * that is git's own rule for `commit -- <pathspec>`, and the dialog says so
+   * when the two actually differ.
+   */
+  paths?: string[]
+}
+
+/** Split out from commit() so the flag combinations are testable without a repo. */
+export function commitArgs(message: string, o: CommitOpts = {}): string[] {
+  return [
+    'commit',
+    ...(o.amend ? ['--amend'] : []),
+    ...(o.signoff ? ['--signoff'] : []),
+    ...(o.noVerify ? ['--no-verify'] : []),
+    '-m',
+    message,
+    // `--` must come last: everything after it is a pathspec, so a path that
+    // looks like a flag cannot be read as one.
+    ...(o.paths?.length ? ['--', ...o.paths] : [])
+  ]
+}
+
+export const commit = (cwd: string, message: string, o: CommitOpts = {}) =>
+  git(cwd, commitArgs(message, o))
+
+/** HEAD's message, so ticking Amend cannot silently throw the old one away. */
+export const lastMessage = async (cwd: string) =>
+  (await git(cwd, ['log', '-1', '--format=%B'])).trimEnd()
 export const fetch = (cwd: string) => git(cwd, ['fetch', '--all', '--prune'])
 export const pull = (cwd: string, rebase = true) =>
   git(cwd, ['pull', rebase ? '--rebase' : '--no-rebase'])
