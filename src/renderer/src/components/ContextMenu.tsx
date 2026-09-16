@@ -94,7 +94,13 @@ export function Prompt({
   onCancel: () => void
   onOk: (v: string) => void
 }) {
-  const [v, setV] = useState(initial)
+  // Uncontrolled on purpose: the DOM node owns the text, React never writes the
+  // value back. A controlled input silently eats keystrokes whenever its state
+  // fails to round-trip, and it is the usual culprit behind IME composition
+  // (Vietnamese Telex, pinyin) being dropped mid-word.
+  const box = useRef<HTMLInputElement>(null)
+  const [empty, setEmpty] = useState(!initial.trim())
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
     window.addEventListener('keydown', h)
@@ -107,7 +113,8 @@ export function Prompt({
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
-          if (v.trim()) onOk(v.trim())
+          const v = box.current?.value.trim()
+          if (v) onOk(v)
         }}
         className="w-[460px] max-w-full rounded border border-line bg-panel shadow-2xl"
       >
@@ -115,9 +122,11 @@ export function Prompt({
         <div className="p-4">
           {label && <label className="mb-1 block text-muted">{label}</label>}
           <input
+            ref={box}
             autoFocus
-            value={v}
-            onChange={(e) => setV(e.target.value)}
+            defaultValue={initial}
+            // only tracks whether the field is blank, for the submit button
+            onInput={(e) => setEmpty(!e.currentTarget.value.trim())}
             onFocus={(e) => e.currentTarget.select()}
             className="w-full rounded border border-line bg-bg px-2 py-1 outline-none focus:border-accent"
           />
@@ -128,7 +137,7 @@ export function Prompt({
           </button>
           <button
             type="submit"
-            disabled={!v.trim()}
+            disabled={empty}
             className="rounded border border-line bg-bg px-4 py-1 hover:border-accent hover:text-accent disabled:opacity-40"
           >
             {confirmLabel}

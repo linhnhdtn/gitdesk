@@ -164,7 +164,7 @@ export function CommitDialog({
                   <td className="truncate px-2 py-[2px]">
                     <span className="flex items-center gap-1.5">
                       <input type="checkbox" readOnly checked={checked.has(f.path)} className="shrink-0" />
-                      <FileIcon category={category(f)} />
+                      <FileIcon category={category(f)} staged={isStaged(f)} />
                       <span className="truncate">{base(f.path)}</span>
                     </span>
                   </td>

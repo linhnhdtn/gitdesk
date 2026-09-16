@@ -11,6 +11,8 @@
   --color-sel: #cfe3f7;
   /* branch/tag decoration badges in the journal */
   --color-ref: #2e7d32;
+  /* staged rows: a hint, not a highlight — selection must still win */
+  --color-staged: #edf5e9;
 }
 
 html,

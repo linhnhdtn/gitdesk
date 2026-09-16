@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, must } from './api.ts'
 import { Diff, Empty } from './components/Diff.tsx'
-import { PrList, PrDetail, type Repo } from './components/Prs.tsx'
-import { Settings, CreatePr } from './components/Settings.tsx'
 import { Split, Pane } from './components/Split.tsx'
 import { Toolbar, type Item } from './components/Toolbar.tsx'
 import { Repositories, type Brief } from './components/Repositories.tsx'
@@ -17,15 +15,14 @@ import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
 import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
-import type { PR } from '../../main/github.ts'
 
 const STORE_KEY = 'gitdesk.repo'
 const LIST_KEY = 'gitdesk.repos'
 const LAYOUT_KEY = 'gitdesk.layout'
 const TABS_KEY = 'gitdesk.tabs'
 const HIDE_KEY = 'gitdesk.hidden'
-type BottomTab = 'journal' | 'diff' | 'prs' | 'console'
-const TABS: BottomTab[] = ['journal', 'diff', 'prs', 'console']
+type BottomTab = 'journal' | 'diff' | 'console'
+const TABS: BottomTab[] = ['journal', 'diff', 'console']
 type Layout = { left: number; repos: number; files: number }
 
 const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
@@ -49,7 +46,6 @@ export default function App() {
   const [commits, setCommits] = useState<Commit[]>([])
   const [refs, setRefs] = useState<Ref[]>([])
   const [stashes, setStashes] = useState<Stash[]>([])
-  const [repo, setRepo] = useState<Repo | null>(null)
 
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [commitSel, setCommitSel] = useState<string | null>(null)
@@ -63,10 +59,8 @@ export default function App() {
     return [...saved.filter((t) => TABS.includes(t)), ...TABS.filter((t) => !saved.includes(t))]
   })
 
-  const [pr, setPr] = useState<PR | null>(null)
-  const [prKey, setPrKey] = useState(0)
   const [diff, setDiff] = useState('')
-  const [modal, setModal] = useState<'settings' | 'createPr' | 'commit' | null>(null)
+  const [modal, setModal] = useState<'commit' | null>(null)
   const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
@@ -123,15 +117,12 @@ export default function App() {
     setCommits(c)
     setRefs(r)
     setStashes(sl)
-    const rm = await must(api.remote(cwd)).catch(() => null)
-    setRepo(rm && rm.owner ? { owner: rm.owner, repo: rm.repo, provider: rm.provider } : null)
   }, [cwd])
 
   useEffect(() => {
     if (cwd) localStorage.setItem(STORE_KEY, cwd)
     setSel(new Set())
     setCommitSel(null)
-    setPr(null)
     setCompare(null)
     run(refresh)
   }, [cwd, refresh, run])
@@ -217,6 +208,17 @@ export default function App() {
 
   const copy = (t: string) => run(() => must(api.copy(t)))
 
+  /** Create a branch and switch to it. `start` omitted means "from HEAD". */
+  const newBranch = (start?: string) =>
+    setPrompt({
+      title: 'New Branch',
+      label: start ? `Name for the branch starting at ${start}` : `Name for the branch starting at ${st?.branch ?? 'HEAD'}`,
+      // origin/feature -> feature: the obvious local name for a remote branch
+      initial: start?.includes('/') ? start.slice(start.indexOf('/') + 1) : '',
+      confirmLabel: 'Create',
+      onOk: (v) => act(() => must(api.createBranch(cwd!, v, start)))
+    })
+
   /** Right-click on a file row. Acts on the whole selection when it has one. */
   function fileMenu(f: FileStatus, x: number, y: number) {
     const target = picked.length > 1 && sel.has(f.path) ? picked : [f]
@@ -285,6 +287,7 @@ export default function App() {
       y,
       items: [
         { label: 'Check Out…', onClick: () => act(() => must(api.checkout(cwd!, checkoutAs))), disabled: r.current },
+        { label: 'New Branch from here…', onClick: () => newBranch(r.name) },
         'sep',
         { label: `Merge into ${st?.branch ?? 'HEAD'}`, onClick: () => act(() => must(api.merge(cwd!, r.name))), disabled: r.current },
         { label: 'Fast-Forward Merge', onClick: () => act(() => must(api.merge(cwd!, r.name, true))), disabled: r.current },
@@ -403,8 +406,7 @@ export default function App() {
         badge: cmds.length,
         onClick: () => setBottom((b) => (b === 'console' ? 'journal' : 'console')),
         title: 'Command console (Ctrl+`)'
-      },
-      { label: 'Settings', icon: 'settings', onClick: () => setModal('settings') }
+      }
     ]
   ]
 
@@ -444,7 +446,19 @@ export default function App() {
             </div>
           </Pane>
           <Split dir="y" value={layout.repos} min={80} max={600} onChange={(n) => setLayout((l) => ({ ...l, repos: n }))} />
-          <Pane title="Branches" className="flex-1">
+          <Pane
+            title="Branches"
+            right={
+              <button
+                onClick={() => newBranch()}
+                className="rounded px-1.5 hover:bg-line"
+                title="New branch from the current HEAD"
+              >
+                ＋
+              </button>
+            }
+            className="flex-1"
+          >
             <Branches
               refs={refs}
               stashes={stashes}
@@ -526,7 +540,7 @@ export default function App() {
                 onReorder={setTabOrder}
                 label={(t) => (
                   <>
-                    {t === 'prs' ? 'Pull Requests' : t}
+                    {t}
                     {t === 'console' && !!cmds.length && (
                       <span className="ml-1 font-normal text-muted">{cmds.length}</span>
                     )}
@@ -545,7 +559,7 @@ export default function App() {
                 </button>
               ) : (
                 <button
-                  onClick={() => (run(refresh), setPrKey((k) => k + 1))}
+                  onClick={() => run(refresh)}
                   className="rounded px-1.5 hover:bg-line"
                   title="Refresh"
                 >
@@ -571,18 +585,6 @@ export default function App() {
             {bottom === 'diff' &&
               (diff ? <Diff text={diff} /> : <Empty>Select a file or a commit</Empty>)}
             {bottom === 'console' && <Console cmds={cmds} />}
-            {bottom === 'prs' &&
-              (pr && repo ? (
-                <PrDetail pr={pr} repo={repo} onDone={() => (setPr(null), setPrKey((k) => k + 1))} />
-              ) : (
-                <PrList
-                  repo={repo}
-                  sel={pr}
-                  refreshKey={prKey}
-                  onSelect={setPr}
-                  onCreate={() => setModal('createPr')}
-                />
-              ))}
           </Pane>
         </div>
       </div>
@@ -614,15 +616,6 @@ export default function App() {
         />
       )}
 
-      {modal === 'settings' && <Settings onClose={() => (setModal(null), setPrKey((k) => k + 1))} />}
-      {modal === 'createPr' && repo && st && (
-        <CreatePr
-          repo={repo}
-          head={st.branch}
-          onClose={() => setModal(null)}
-          onCreated={() => (setModal(null), setPrKey((k) => k + 1))}
-        />
-      )}
     </div>
   )
 }

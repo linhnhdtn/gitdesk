@@ -36,12 +36,12 @@ Electron three-process app. Node 22 runs the `.ts` sources directly (type stripp
 src/main/     Node side. The only place that touches git or the network.
 src/preload/  contextBridge → window.api. contextIsolation on, sandbox off.
 src/renderer/ React 19 + Tailwind v4. No node access at all.
-src/shared/   Pure logic imported by both sides (currently check-run rollup).
+src/shared/   Pure logic imported by both sides, each with a node:test file.
 ```
 
 ### Adding a capability = four edits in lockstep
 
-1. `src/main/git.ts` or `src/main/github.ts` — the actual implementation
+1. `src/main/git.ts` — the actual implementation
 2. `src/main/index.ts` — one `handle('namespace:verb', fn)` line
 3. `src/preload/index.ts` — one entry on the `api` object with the response type
 4. renderer — call it through `must(api.thing(...))`
@@ -58,9 +58,9 @@ the renderer side so UI code can `try/catch` once. Both `App.tsx` (`run`) and `P
 
 ### Types cross the process boundary, code does not
 
-`preload/index.ts` and the renderer use `import type` against `src/main/git.ts` /
-`src/main/github.ts` (`RepoStatus`, `Commit`, `PR`, `Check`). These are erased at build time —
-never import a *value* from `src/main/` into the renderer.
+`preload/index.ts` and the renderer use `import type` against `src/main/git.ts`
+(`RepoStatus`, `FileStatus`, `Commit`, `Ref`, `Stash`, `GitCmd`). These are erased at build
+time — never import a *value* from `src/main/` into the renderer.
 
 ### Git layer
 
@@ -80,23 +80,10 @@ untracked` → unstaged), so changing the parser's semantics changes the UI spli
 
 `push()` uses `--force-with-lease`, never bare `--force`.
 
-### GitHub layer
-
-`src/main/github.ts` wraps `fetch` against api.github.com with a PAT. Token is stored in
-`app.getPath('userData')/gh.token`, encrypted via Electron `safeStorage` (GNOME Keyring on
-Linux); with no keyring backend it falls back to a `0600` plaintext file and the Settings UI
-says so. `loadToken()` also falls back to plaintext on decrypt failure, for tokens written
-before a keyring existed.
-
-`remoteInfo()` in `git.ts` parses `origin` into `{owner, repo, provider}`; the PR panel renders
-only when `provider === 'github'`.
-
 ### Renderer state model
 
 Single `App.tsx` owns repo path (persisted to `localStorage`), tab, status, log, selection and
-modals. There is **no filesystem watcher** — `refresh()` re-runs on window `focus`. The PR
-panel refetches via a `prKey` counter bumped by the ↻ button and by modal close; it is not
-driven by `refresh()`.
+modals. There is **no filesystem watcher** — `refresh()` re-runs on window `focus`.
 
 Tailwind v4 with no config file — the palette (`bg`, `panel`, `line`, `fg`, `muted`, `accent`)
 is defined in `@theme` inside `src/renderer/src/index.css`.
@@ -104,8 +91,9 @@ is defined in `@theme` inside `src/renderer/src/index.css`.
 ## Conventions
 
 `ponytail:` comments mark deliberate shortcuts with their known ceiling and upgrade path
-(focus-based refresh instead of a watcher; N check-run calls for N PRs). Keep that format when
-adding one.
+(focus-based refresh instead of a watcher; 8-lane clamp on the commit graph). Keep that
+format when adding one.
 
-Non-trivial logic leaves one runnable `node:test` file behind — see `git.test.ts` and
-`checks.test.ts`. No test framework, no fixtures.
+Non-trivial logic leaves one runnable `node:test` file behind — see `git.test.ts`,
+`filestate.test.ts`, `graph.test.ts` and `sidebyside.test.ts`. No test framework, no
+fixtures.

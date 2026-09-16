@@ -45,6 +45,14 @@ test('isStaged ignores the untracked and ignored markers', () => {
   assert.equal(isStaged(f('!', '!', 'ignored')), false)
 })
 
+test('a conflicted file is not staged, however its index code reads', () => {
+  // git refuses to commit while unmerged, so the ✓ marker and the commit
+  // dialog's staged list must both leave it out
+  assert.equal(isStaged(f('U', 'U', 'unmerged')), false)
+  assert.equal(isStaged(f('A', 'A', 'unmerged')), false)
+  assert.equal(isStaged(f('D', 'U', 'unmerged')), false)
+})
+
 test('counts totals every file exactly once', () => {
   const files = [f('A', '.'), f('?', '?', 'untracked'), f('.', 'M'), f('D', '.')]
   const c = counts(files)

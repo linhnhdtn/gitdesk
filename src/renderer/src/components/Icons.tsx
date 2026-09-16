@@ -83,12 +83,6 @@ const TOOLBAR: Record<string, React.ReactNode> = {
       <rect x="2.5" y="4" width="19" height="16" rx="2" />
       <path d="M6.5 9.5l3 2.5-3 2.5M12.5 15h5" />
     </>
-  ),
-  settings: (
-    <>
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1M18.7 18.7l-2.1-2.1M7.4 7.4L5.3 5.3" />
-    </>
   )
 }
 
@@ -146,7 +140,16 @@ const FILE_STYLE: Record<
   conflict: { fill: '#fbe3c4', stroke: C.orange, badge: C.orange, glyph: 'M5 8.5v3.4M5 13.4v.7' }
 }
 
-export function FileIcon({ category, size = 16 }: { category: Category; size?: number }) {
+export function FileIcon({
+  category,
+  staged = false,
+  size = 16
+}: {
+  category: Category
+  /** staged is orthogonal to category, so it gets its own corner */
+  staged?: boolean
+  size?: number
+}) {
   const s = FILE_STYLE[category]
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" className="shrink-0" aria-hidden>
@@ -165,6 +168,23 @@ export function FileIcon({ category, size = 16 }: { category: Category; size?: n
           <circle cx="5" cy="11.2" r="4.8" fill="#fff" />
           <circle cx="5" cy="11.2" r="4" fill={s.badge} />
           <path d={s.glyph} stroke="#fff" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        </>
+      )}
+      {staged && (
+        // opposite corner from the category badge, so the two never collide.
+        // At 16px the tick is only a few pixels — the solid green disc is what
+        // actually carries the signal, the tick is for larger sizes.
+        <>
+          <circle cx="11.6" cy="4.4" r="4.3" fill="#fff" />
+          <circle cx="11.6" cy="4.4" r="3.5" fill={C.green} />
+          <path
+            d="M9.9 4.5l1.3 1.3 2.2-2.6"
+            stroke="#fff"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
         </>
       )}
     </svg>

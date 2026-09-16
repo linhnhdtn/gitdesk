@@ -42,7 +42,13 @@ export function state(f: FileStatus): string {
   return parts.join(', ') || 'Unchanged'
 }
 
-export const isStaged = (f: FileStatus) => f.x !== '.' && f.x !== '?' && f.x !== '!'
+/**
+ * Staged means "recorded in the index and ready to commit". An unmerged entry
+ * carries index codes too (U/A/D), but git refuses to commit while it is
+ * conflicted — so it is not staged, it is blocked.
+ */
+export const isStaged = (f: FileStatus) =>
+  f.kind !== 'unmerged' && f.x !== '.' && f.x !== '?' && f.x !== '!'
 
 export function counts(files: FileStatus[]): Record<Category, number> {
   const out: Record<Category, number> = { conflict: 0, deleted: 0, renamed: 0, added: 0, modified: 0 }

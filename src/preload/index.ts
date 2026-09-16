@@ -18,6 +18,8 @@ export const api = {
   ignore: (cwd: string, patterns: string[]) => call<string>('git:ignore', cwd, patterns),
   merge: (cwd: string, ref: string, ffOnly = false) => call<string>('git:merge', cwd, ref, ffOnly),
   rebase: (cwd: string, ref: string) => call<string>('git:rebase', cwd, ref),
+  createBranch: (cwd: string, name: string, start?: string) =>
+    call<string>('git:createBranch', cwd, name, start),
   renameBranch: (cwd: string, from: string, to: string) =>
     call<string>('git:renameBranch', cwd, from, to),
   deleteBranch: (cwd: string, name: string, force = false) =>
@@ -52,30 +54,7 @@ export const api = {
     const h = (_: unknown, e: import('../main/git.ts').GitCmd) => cb(e)
     ipcRenderer.on('git:cmd', h)
     return () => void ipcRenderer.off('git:cmd', h)
-  },
-  // --- GitHub ---
-  saveToken: (t: string) => call<{ encrypted: boolean }>('gh:saveToken', t),
-  hasToken: () => call<boolean>('gh:hasToken'),
-  clearToken: () => call<void>('gh:clearToken'),
-  whoami: () => call<{ login: string; name: string }>('gh:whoami'),
-  prs: (o: string, r: string) => call<import('../main/github.ts').PR[]>('gh:prs', o, r),
-  defaultBranch: (o: string, r: string) => call<string>('gh:defaultBranch', o, r),
-  createPR: (o: string, r: string, b: { title: string; head: string; base: string; body?: string; draft?: boolean }) =>
-    call<import('../main/github.ts').PR>('gh:createPR', o, r, b),
-  mergePR: (o: string, r: string, n: number, m: 'merge' | 'squash' | 'rebase') =>
-    call<{ merged: boolean; message: string }>('gh:mergePR', o, r, n, m),
-  closePR: (o: string, r: string, n: number) => call<unknown>('gh:closePR', o, r, n),
-  checks: (o: string, r: string, sha: string) =>
-    call<import('../main/github.ts').Check[]>('gh:checks', o, r, sha),
-  reviews: (o: string, r: string, n: number) =>
-    call<{ state: string; user: { login: string } }[]>('gh:reviews', o, r, n),
-  openExternal: (url: string) => call<void>('sys:openExternal', url),
-
-  remote: (cwd: string) =>
-    call<{ url: string; host: string; owner: string; repo: string; provider: string }>(
-      'git:remote',
-      cwd
-    )
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

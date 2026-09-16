@@ -1,6 +1,6 @@
 import type { FileStatus } from '../../../main/git.ts'
 import { FileIcon } from './Icons.tsx'
-import { category, state } from '../../../shared/filestate.ts'
+import { category, state, isStaged } from '../../../shared/filestate.ts'
 
 const dir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const base = (p: string) => p.slice(p.lastIndexOf('/') + 1)
@@ -33,6 +33,7 @@ export function Files({
       <tbody>
         {files.map((f) => {
           const on = sel.has(f.path)
+          const staged = isStaged(f)
           const conflict = f.kind === 'unmerged'
           return (
             <tr
@@ -46,11 +47,13 @@ export function Files({
                 onMenu(f, e.clientX, e.clientY)
               }}
               title={`${f.origPath ? `${f.origPath} → ` : ''}${f.path}\nDouble-click to compare`}
-              className={`cursor-default ${on ? 'bg-sel' : 'hover:bg-panel'}`}
+              className={`cursor-default ${
+                on ? 'bg-sel' : staged ? 'bg-staged hover:bg-panel' : 'hover:bg-panel'
+              }`}
             >
               <Td className={conflict ? 'text-rose-700' : ''}>
                 <span className="flex items-center gap-1.5">
-                  <FileIcon category={category(f)} />
+                  <FileIcon category={category(f)} staged={staged} />
                   <span className="truncate">{base(f.path)}</span>
                 </span>
               </Td>

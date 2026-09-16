@@ -212,6 +212,12 @@ export async function ignore(cwd: string, patterns: string[]) {
 export const merge = (cwd: string, ref: string, ffOnly = false) =>
   git(cwd, ['merge', ...(ffOnly ? ['--ff-only'] : []), ref])
 export const rebase = (cwd: string, ref: string) => git(cwd, ['rebase', ref])
+/**
+ * Create and switch in one step — `checkout -b` rather than `branch` + `checkout`,
+ * so a name git rejects leaves nothing half-made. `start` defaults to HEAD.
+ */
+export const createBranch = (cwd: string, name: string, start?: string) =>
+  git(cwd, ['checkout', '-b', name, ...(start ? [start] : [])])
 export const renameBranch = (cwd: string, from: string, to: string) =>
   git(cwd, ['branch', '-m', from, to])
 /** -d refuses to drop unmerged work; -D is the explicit override. */
@@ -349,13 +355,3 @@ export async function repoBrief(cwd: string) {
 /** Full patch for one commit, for the Diff tab when a journal row is clicked. */
 export const showCommit = (cwd: string, sha: string) =>
   git(cwd, ['show', '--stat', '--patch', '--format=fuller', sha])
-
-/** Remote URL -> which hosting provider, for the PR/MR panel later. */
-export async function remoteInfo(cwd: string) {
-  const url = (await git(cwd, ['remote', 'get-url', 'origin'])).trim()
-  const m = url.match(/(?:https?:\/\/|git@)([^/:]+)[/:]([^/]+)\/(.+?)(?:\.git)?$/)
-  if (!m) return { url, host: '', owner: '', repo: '', provider: 'unknown' as const }
-  const [, host, owner, repo] = m
-  const provider = host.includes('github') ? 'github' : host.includes('gitlab') ? 'gitlab' : 'unknown'
-  return { url, host, owner, repo, provider } as const
-}

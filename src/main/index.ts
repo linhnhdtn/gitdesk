@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron'
 import { join } from 'node:path'
 import * as G from './git.ts'
-import * as H from './github.ts'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -55,6 +54,9 @@ handle('git:remove', (cwd: string, tracked: string[], untracked: string[]) =>
 handle('git:ignore', (cwd: string, patterns: string[]) => G.ignore(cwd, patterns))
 handle('git:merge', (cwd: string, ref: string, ffOnly: boolean) => G.merge(cwd, ref, ffOnly))
 handle('git:rebase', (cwd: string, ref: string) => G.rebase(cwd, ref))
+handle('git:createBranch', (cwd: string, name: string, start?: string) =>
+  G.createBranch(cwd, name, start)
+)
 handle('git:renameBranch', (cwd: string, from: string, to: string) => G.renameBranch(cwd, from, to))
 handle('git:deleteBranch', (cwd: string, name: string, force: boolean) =>
   G.deleteBranch(cwd, name, force)
@@ -69,7 +71,6 @@ handle('git:pull', (cwd: string, rebase: boolean) => G.pull(cwd, rebase))
 handle('git:push', (cwd: string, force: boolean) => G.push(cwd, force))
 handle('git:refs', (cwd: string) => G.refs(cwd))
 handle('git:checkout', (cwd: string, ref: string) => G.checkout(cwd, ref))
-handle('git:remote', (cwd: string) => G.remoteInfo(cwd))
 handle('git:discard', (cwd: string, paths: string[], untracked: string[]) =>
   G.discard(cwd, paths, untracked)
 )
@@ -80,18 +81,6 @@ handle('git:stashDrop', (cwd: string, ref: string) => G.stashDrop(cwd, ref))
 handle('git:repoBrief', (cwd: string) => G.repoBrief(cwd))
 handle('git:showCommit', (cwd: string, sha: string) => G.showCommit(cwd, sha))
 
-handle('gh:saveToken', (t: string) => H.saveToken(t))
-handle('gh:hasToken', () => H.loadToken() !== null)
-handle('gh:clearToken', () => H.clearToken())
-handle('gh:whoami', () => H.whoami())
-handle('gh:prs', (o: string, r: string) => H.listPRs(o, r))
-handle('gh:defaultBranch', (o: string, r: string) => H.defaultBranch(o, r))
-handle('gh:createPR', (o: string, r: string, b: Parameters<typeof H.createPR>[2]) => H.createPR(o, r, b))
-handle('gh:mergePR', (o: string, r: string, n: number, m: 'merge' | 'squash' | 'rebase') => H.mergePR(o, r, n, m))
-handle('gh:closePR', (o: string, r: string, n: number) => H.closePR(o, r, n))
-handle('gh:checks', (o: string, r: string, sha: string) => H.checks(o, r, sha))
-handle('gh:reviews', (o: string, r: string, n: number) => H.reviews(o, r, n))
-handle('sys:openExternal', (url: string) => shell.openExternal(url))
 handle('sys:openPath', async (cwd: string, path: string) => {
   const e = await shell.openPath(G.inRepo(cwd, path))
   if (e) throw new Error(e) // openPath reports failure as a string, it does not throw
