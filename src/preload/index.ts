@@ -13,6 +13,20 @@ export const api = {
   readWorktree: (cwd: string, path: string) => call<string>('git:readWorktree', cwd, path),
   /** Untracked files need a synthesised patch — `git diff` returns nothing for them. */
   diffNew: (cwd: string, path: string) => call<string>('git:diffNew', cwd, path),
+  remove: (cwd: string, tracked: string[], untracked: string[] = []) =>
+    call<string>('git:remove', cwd, tracked, untracked),
+  ignore: (cwd: string, patterns: string[]) => call<string>('git:ignore', cwd, patterns),
+  merge: (cwd: string, ref: string, ffOnly = false) => call<string>('git:merge', cwd, ref, ffOnly),
+  rebase: (cwd: string, ref: string) => call<string>('git:rebase', cwd, ref),
+  renameBranch: (cwd: string, from: string, to: string) =>
+    call<string>('git:renameBranch', cwd, from, to),
+  deleteBranch: (cwd: string, name: string, force = false) =>
+    call<string>('git:deleteBranch', cwd, name, force),
+  pushBranch: (cwd: string, branch: string, setUpstream = false) =>
+    call<string>('git:pushBranch', cwd, branch, setUpstream),
+  openPath: (cwd: string, path: string) => call<void>('sys:openPath', cwd, path),
+  reveal: (cwd: string, path: string) => call<void>('sys:reveal', cwd, path),
+  copy: (text: string) => call<void>('sys:copy', text),
   stage: (cwd: string, paths: string[]) => call<string>('git:stage', cwd, paths),
   unstage: (cwd: string, paths: string[]) => call<string>('git:unstage', cwd, paths),
   commit: (cwd: string, msg: string, opts: import('../main/git.ts').CommitOpts = {}) =>

@@ -1,3 +1,5 @@
+import type { Category } from '../../../shared/filestate.ts'
+
 /**
  * Inline SVG icon set. No asset files and no dependency: the glyphs are simple
  * enough that paths cost less than a sprite sheet, and they inherit currentColor
@@ -92,14 +94,6 @@ const TOOLBAR: Record<string, React.ReactNode> = {
 
 // ── 16x16 list glyphs ──────────────────────────────────────────────────
 const LIST: Record<string, React.ReactNode> = {
-  /** a page with a folded corner — colour carries the file's state */
-  file: (
-    <>
-      <path d="M3.5 1.5h5.5l3.5 3.5v9.5h-9z" fill="#fff" />
-      <path d="M9 1.5v3.5h3.5" />
-      <path d="M5.5 8.5h5M5.5 11h5" opacity="0.5" />
-    </>
-  ),
   repo: (
     <>
       <ellipse cx="8" cy="3.9" rx="5.4" ry="2" fill="#f3e7cf" stroke={C.tan} />
@@ -133,6 +127,47 @@ const LIST: Record<string, React.ReactNode> = {
       <path d="M1.8 8.1h12.4" />
       <path d="M6.6 5.9h2.8M6.6 10.3h2.8" opacity="0.7" />
     </>
+  )
+}
+
+/**
+ * File glyphs carry TWO signals, so a state is readable at 14px and without
+ * relying on colour alone: the page fill, and a badge in the corner.
+ */
+const FILE_STYLE: Record<
+  Category,
+  { fill: string; stroke: string; badge?: string; glyph?: string }
+> = {
+  modified: { fill: '#f7d9d6', stroke: C.red },
+  added: { fill: '#ffffff', stroke: C.blue, badge: C.green, glyph: 'M5 8.8v4.8M2.6 11.2h4.8' },
+  deleted: { fill: '#e8e8e8', stroke: C.grey, badge: C.red, glyph: 'M2.6 11.2h4.8' },
+  // its own fill, because a white page with a green badge is already "added"
+  renamed: { fill: '#dcecdc', stroke: C.green, badge: C.green, glyph: 'M2.5 11.2h4.4M5.2 9.4l1.8 1.8-1.8 1.8' },
+  conflict: { fill: '#fbe3c4', stroke: C.orange, badge: C.orange, glyph: 'M5 8.5v3.4M5 13.4v.7' }
+}
+
+export function FileIcon({ category, size = 16 }: { category: Category; size?: number }) {
+  const s = FILE_STYLE[category]
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className="shrink-0" aria-hidden>
+      <path
+        d="M3.2 1.4h5.7l3.5 3.5v9.4a.8.8 0 0 1-.8.8H4a.8.8 0 0 1-.8-.8z"
+        fill={s.fill}
+        stroke={s.stroke}
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      <path d="M8.9 1.4v3.5h3.5" fill="none" stroke={s.stroke} strokeWidth="1" strokeLinejoin="round" />
+      {s.badge && (
+        <>
+          {/* big enough that the badge COLOUR still separates the states at 15px,
+              where the glyph inside it is only a few pixels and turns to mush */}
+          <circle cx="5" cy="11.2" r="4.8" fill="#fff" />
+          <circle cx="5" cy="11.2" r="4" fill={s.badge} />
+          <path d={s.glyph} stroke="#fff" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        </>
+      )}
+    </svg>
   )
 }
 

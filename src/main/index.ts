@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron'
 import { join } from 'node:path'
 import * as G from './git.ts'
 import * as H from './github.ts'
@@ -49,6 +49,17 @@ handle('git:diff', (cwd: string, path: string, staged: boolean, context: number)
 )
 handle('git:readWorktree', (cwd: string, path: string) => G.readWorktree(cwd, path))
 handle('git:diffNew', (cwd: string, path: string) => G.diffNew(cwd, path))
+handle('git:remove', (cwd: string, tracked: string[], untracked: string[]) =>
+  G.remove(cwd, tracked, untracked)
+)
+handle('git:ignore', (cwd: string, patterns: string[]) => G.ignore(cwd, patterns))
+handle('git:merge', (cwd: string, ref: string, ffOnly: boolean) => G.merge(cwd, ref, ffOnly))
+handle('git:rebase', (cwd: string, ref: string) => G.rebase(cwd, ref))
+handle('git:renameBranch', (cwd: string, from: string, to: string) => G.renameBranch(cwd, from, to))
+handle('git:deleteBranch', (cwd: string, name: string, force: boolean) =>
+  G.deleteBranch(cwd, name, force)
+)
+handle('git:pushBranch', (cwd: string, b: string, up: boolean) => G.pushBranch(cwd, b, up))
 handle('git:stage', (cwd: string, paths: string[]) => G.stage(cwd, paths))
 handle('git:unstage', (cwd: string, paths: string[]) => G.unstage(cwd, paths))
 handle('git:commit', (cwd: string, msg: string, opts: G.CommitOpts) => G.commit(cwd, msg, opts))
@@ -81,6 +92,12 @@ handle('gh:closePR', (o: string, r: string, n: number) => H.closePR(o, r, n))
 handle('gh:checks', (o: string, r: string, sha: string) => H.checks(o, r, sha))
 handle('gh:reviews', (o: string, r: string, n: number) => H.reviews(o, r, n))
 handle('sys:openExternal', (url: string) => shell.openExternal(url))
+handle('sys:openPath', async (cwd: string, path: string) => {
+  const e = await shell.openPath(G.inRepo(cwd, path))
+  if (e) throw new Error(e) // openPath reports failure as a string, it does not throw
+})
+handle('sys:copy', (text: string) => clipboard.writeText(text))
+handle('sys:reveal', (cwd: string, path: string) => shell.showItemInFolder(G.inRepo(cwd, path)))
 
 // Single-window app, so no ref to keep and no listener to tear down on re-create.
 G.bus.on('cmd', (e) => BrowserWindow.getAllWindows()[0]?.webContents.send('git:cmd', e))

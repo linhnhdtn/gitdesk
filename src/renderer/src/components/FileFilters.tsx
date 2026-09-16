@@ -1,18 +1,13 @@
-import { Icon, C } from './Icons.tsx'
+import { FileIcon } from './Icons.tsx'
 import type { Category } from '../../../shared/filestate.ts'
 
-export const CATEGORIES: { key: Category; label: string; color: string }[] = [
-  { key: 'modified', label: 'modified files', color: C.red },
-  { key: 'added', label: 'new files', color: C.blue },
-  { key: 'deleted', label: 'deleted files', color: C.grey },
-  { key: 'renamed', label: 'renamed files', color: C.green },
-  { key: 'conflict', label: 'conflicting files', color: C.orange }
+export const CATEGORIES: { key: Category; label: string }[] = [
+  { key: 'modified', label: 'modified files' },
+  { key: 'added', label: 'new files' },
+  { key: 'deleted', label: 'deleted files' },
+  { key: 'renamed', label: 'renamed files' },
+  { key: 'conflict', label: 'conflicting files' }
 ]
-
-export const CATEGORY_COLOR = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.color])) as Record<
-  Category,
-  string
->
 
 /** One small toggle per file category, the way SmartGit gates its Files list. */
 export function FileFilters({
@@ -38,7 +33,7 @@ export function FileFilters({
               on ? 'bg-bg hover:bg-line' : 'bg-panel opacity-35 grayscale hover:opacity-70'
             }`}
           >
-            <Icon name="file" color={c.color} size={14} />
+            <FileIcon category={c.key} size={14} />
           </button>
         )
       })}

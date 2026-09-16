@@ -1,6 +1,5 @@
 import type { FileStatus } from '../../../main/git.ts'
-import { Icon } from './Icons.tsx'
-import { CATEGORY_COLOR } from './FileFilters.tsx'
+import { FileIcon } from './Icons.tsx'
 import { category, state } from '../../../shared/filestate.ts'
 
 const dir = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
@@ -10,13 +9,15 @@ export function Files({
   files,
   sel,
   onSelect,
-  onCompare
+  onCompare,
+  onMenu
 }: {
   files: FileStatus[]
   sel: Set<string>
   /** ctrl/meta held -> extend the selection instead of replacing it */
   onSelect: (path: string, extend: boolean) => void
   onCompare: (f: FileStatus) => void
+  onMenu: (f: FileStatus, x: number, y: number) => void
 }) {
   if (!files.length) return <div className="p-2 text-muted">Working tree clean</div>
 
@@ -38,12 +39,18 @@ export function Files({
               key={f.path}
               onClick={(e) => onSelect(f.path, e.ctrlKey || e.metaKey)}
               onDoubleClick={() => onCompare(f)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                // right-clicking outside the selection acts on that row instead
+                if (!sel.has(f.path)) onSelect(f.path, false)
+                onMenu(f, e.clientX, e.clientY)
+              }}
               title={`${f.origPath ? `${f.origPath} → ` : ''}${f.path}\nDouble-click to compare`}
               className={`cursor-default ${on ? 'bg-sel' : 'hover:bg-panel'}`}
             >
               <Td className={conflict ? 'text-rose-700' : ''}>
                 <span className="flex items-center gap-1.5">
-                  <Icon name="file" color={CATEGORY_COLOR[category(f)]} size={14} />
+                  <FileIcon category={category(f)} />
                   <span className="truncate">{base(f.path)}</span>
                 </span>
               </Td>

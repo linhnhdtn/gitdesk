@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { EventEmitter } from 'node:events'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile, rm } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import { newFilePatch } from '../shared/sidebyside.ts'
 
@@ -178,12 +178,47 @@ export async function diffNew(cwd: string, path: string): Promise<string> {
   return newFilePatch(path, await readWorktree(cwd, path))
 }
 
-export async function readWorktree(cwd: string, path: string): Promise<string> {
+export function inRepo(cwd: string, path: string): string {
   const root = resolve(cwd)
   const full = resolve(root, path)
   if (full !== root && !full.startsWith(root + sep)) throw new Error(`path escapes repo: ${path}`)
-  return readFile(full, 'utf8')
+  return full
 }
+
+export const readWorktree = (cwd: string, path: string) => readFile(inRepo(cwd, path), 'utf8')
+
+/**
+ * Delete files. Tracked ones go through `git rm` so the removal is staged;
+ * untracked ones only exist on disk, so they are unlinked directly.
+ */
+export async function remove(cwd: string, tracked: string[], untracked: string[] = []) {
+  if (tracked.length) await git(cwd, ['rm', '-f', '-r', '--', ...tracked])
+  for (const p of untracked) await rm(inRepo(cwd, p), { recursive: true, force: true })
+  return ''
+}
+
+/** Append patterns to .gitignore, creating it and keeping one per line. */
+export async function ignore(cwd: string, patterns: string[]) {
+  const file = inRepo(cwd, '.gitignore')
+  const old = await readFile(file, 'utf8').catch(() => '')
+  const have = new Set(old.split('\n').map((l) => l.trim()))
+  const add = patterns.filter((p) => !have.has(p.trim()))
+  if (!add.length) return old
+  const body = old && !old.endsWith('\n') ? old + '\n' : old
+  await writeFile(file, body + add.join('\n') + '\n')
+  return body + add.join('\n') + '\n'
+}
+
+export const merge = (cwd: string, ref: string, ffOnly = false) =>
+  git(cwd, ['merge', ...(ffOnly ? ['--ff-only'] : []), ref])
+export const rebase = (cwd: string, ref: string) => git(cwd, ['rebase', ref])
+export const renameBranch = (cwd: string, from: string, to: string) =>
+  git(cwd, ['branch', '-m', from, to])
+/** -d refuses to drop unmerged work; -D is the explicit override. */
+export const deleteBranch = (cwd: string, name: string, force = false) =>
+  git(cwd, ['branch', force ? '-D' : '-d', name])
+export const pushBranch = (cwd: string, branch: string, setUpstream = false) =>
+  git(cwd, ['push', ...(setUpstream ? ['-u'] : []), 'origin', branch])
 
 export const stage = (cwd: string, paths: string[]) => git(cwd, ['add', '--', ...paths])
 export const unstage = (cwd: string, paths: string[]) =>

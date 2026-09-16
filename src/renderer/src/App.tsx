@@ -15,6 +15,7 @@ import { Console } from './components/Console.tsx'
 import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
+import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 import type { PR } from '../../main/github.ts'
 
@@ -68,6 +69,14 @@ export default function App() {
   const [modal, setModal] = useState<'settings' | 'createPr' | 'commit' | null>(null)
   const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  const [prompt, setPrompt] = useState<{
+    title: string
+    label?: string
+    initial?: string
+    confirmLabel?: string
+    onOk: (v: string) => void
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -206,6 +215,122 @@ export default function App() {
     run(async () => (await fn(), await refresh(), await refreshBriefs()))
   const at = (fn: (c: string) => Promise<unknown>) => () => cwd && act(() => fn(cwd))
 
+  const copy = (t: string) => run(() => must(api.copy(t)))
+
+  /** Right-click on a file row. Acts on the whole selection when it has one. */
+  function fileMenu(f: FileStatus, x: number, y: number) {
+    const target = picked.length > 1 && sel.has(f.path) ? picked : [f]
+    const paths = target.map((t) => t.path)
+    const n = paths.length
+    const many = n > 1 ? ` ${n} files` : ''
+    const untracked = target.filter((t) => t.kind === 'untracked').map((t) => t.path)
+    const tracked = paths.filter((p) => !untracked.includes(p))
+
+    setMenu({
+      x,
+      y,
+      items: [
+        { label: 'Show Changes', onClick: () => setCompare({ file: f, staged: f.y === '.' && f.kind !== 'untracked' }), disabled: n > 1 },
+        'sep',
+        { label: `Stage${many}`, onClick: () => act(() => must(api.stage(cwd!, paths))) },
+        { label: `Unstage${many}`, onClick: () => act(() => must(api.unstage(cwd!, paths))), disabled: !target.some(isStaged) },
+        { label: 'Commit…', onClick: () => setModal('commit') },
+        'sep',
+        {
+          label: 'Ignore…',
+          onClick: () =>
+            setPrompt({
+              title: 'Ignore',
+              label: 'Pattern to append to .gitignore',
+              initial: f.path,
+              confirmLabel: 'Ignore',
+              onOk: (v) => act(() => must(api.ignore(cwd!, [v])))
+            })
+        },
+        {
+          label: `Discard…${many}`,
+          danger: true,
+          onClick: () => {
+            if (!window.confirm(`Discard local changes in ${n} file(s)?\n\n${paths.join('\n')}`)) return
+            act(() => must(api.discard(cwd!, tracked, untracked)).then(() => setSel(new Set())))
+          }
+        },
+        {
+          label: `Delete…${many}`,
+          danger: true,
+          onClick: () => {
+            if (!window.confirm(`Delete ${n} file(s) from disk?\n\n${paths.join('\n')}`)) return
+            act(() => must(api.remove(cwd!, tracked, untracked)).then(() => setSel(new Set())))
+          }
+        },
+        'sep',
+        { label: 'Open File', onClick: () => run(() => must(api.openPath(cwd!, f.path))), disabled: n > 1 },
+        { label: 'Reveal in File Manager', onClick: () => run(() => must(api.reveal(cwd!, f.path))), disabled: n > 1 },
+        'sep',
+        { label: 'Copy Name', onClick: () => copy(target.map((t) => t.path.split('/').pop()).join('\n')) },
+        { label: 'Copy Relative Path', onClick: () => copy(paths.join('\n')) },
+        { label: 'Copy Full Path', onClick: () => copy(paths.map((p) => `${cwd}/${p}`).join('\n')) }
+      ]
+    })
+  }
+
+  /** Right-click on a branch, remote branch or tag. */
+  function refMenu(r: Ref, x: number, y: number) {
+    const local = r.kind === 'local'
+    // checking out origin/feat means checking out the local branch it tracks
+    const checkoutAs = r.kind === 'remote' ? r.name.slice(r.name.indexOf('/') + 1) : r.name
+
+    setMenu({
+      x,
+      y,
+      items: [
+        { label: 'Check Out…', onClick: () => act(() => must(api.checkout(cwd!, checkoutAs))), disabled: r.current },
+        'sep',
+        { label: `Merge into ${st?.branch ?? 'HEAD'}`, onClick: () => act(() => must(api.merge(cwd!, r.name))), disabled: r.current },
+        { label: 'Fast-Forward Merge', onClick: () => act(() => must(api.merge(cwd!, r.name, true))), disabled: r.current },
+        { label: `Rebase ${st?.branch ?? 'HEAD'} onto`, onClick: () => act(() => must(api.rebase(cwd!, r.name))), disabled: r.current },
+        'sep',
+        {
+          label: 'Push',
+          onClick: () => act(() => must(api.pushBranch(cwd!, r.name, !r.upstream))),
+          disabled: !local
+        },
+        {
+          label: 'Rename…',
+          disabled: !local,
+          onClick: () =>
+            setPrompt({
+              title: 'Rename Branch',
+              label: `New name for ${r.name}`,
+              initial: r.name,
+              confirmLabel: 'Rename',
+              onOk: (v) => act(() => must(api.renameBranch(cwd!, r.name, v)))
+            })
+        },
+        {
+          label: 'Delete…',
+          danger: true,
+          disabled: !local || r.current,
+          onClick: () => {
+            if (!window.confirm(`Delete local branch ${r.name}?`)) return
+            act(async () => {
+              try {
+                await must(api.deleteBranch(cwd!, r.name))
+              } catch (e: any) {
+                // git refuses -d for unmerged work; only force after saying so
+                if (!/not fully merged/i.test(String(e.message ?? e))) throw e
+                if (!window.confirm(`${r.name} is not fully merged. Delete anyway and lose its commits?`)) return
+                await must(api.deleteBranch(cwd!, r.name, true))
+              }
+            })
+          }
+        },
+        'sep',
+        { label: 'Copy Name', onClick: () => copy(r.name) }
+      ]
+    })
+  }
+
   const groups: Item[][] = [
     [
       { label: 'Fetch', icon: 'fetch', onClick: at((c) => must(api.fetch(c))), disabled: busy },
@@ -323,6 +448,7 @@ export default function App() {
             <Branches
               refs={refs}
               stashes={stashes}
+              onMenu={refMenu}
               onCheckout={(r) => act(() => must(api.checkout(cwd!, r)))}
               onStashApply={(r) => act(() => must(api.stashApply(cwd!, r)))}
               onStashDrop={(r) => act(() => must(api.stashDrop(cwd!, r)))}
@@ -376,6 +502,7 @@ export default function App() {
                 // Only the worktree half has something to compare when both are dirty;
                 // a purely staged file compares HEAD against the index instead.
                 onCompare={(f) => setCompare({ file: f, staged: f.y === '.' && f.kind !== 'untracked' })}
+                onMenu={fileMenu}
                 onSelect={(p, extend) =>
                   setSel((s) => {
                     if (!extend) return new Set([p])
@@ -466,6 +593,15 @@ export default function App() {
           file={compare.file}
           staged={compare.staged}
           onClose={() => setCompare(null)}
+        />
+      )}
+
+      {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
+      {prompt && (
+        <Prompt
+          {...prompt}
+          onCancel={() => setPrompt(null)}
+          onOk={(v) => (setPrompt(null), prompt.onOk(v))}
         />
       )}
 

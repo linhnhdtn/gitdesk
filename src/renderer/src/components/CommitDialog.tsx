@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, must } from '../api.ts'
-import { Icon } from './Icons.tsx'
-import { CATEGORY_COLOR } from './FileFilters.tsx'
+import { Icon, FileIcon } from './Icons.tsx'
 import { isStaged, category } from '../../../shared/filestate.ts'
 import type { FileStatus } from '../../../main/git.ts'
 
@@ -165,7 +164,7 @@ export function CommitDialog({
                   <td className="truncate px-2 py-[2px]">
                     <span className="flex items-center gap-1.5">
                       <input type="checkbox" readOnly checked={checked.has(f.path)} className="shrink-0" />
-                      <Icon name="file" color={CATEGORY_COLOR[category(f)]} size={14} />
+                      <FileIcon category={category(f)} />
                       <span className="truncate">{base(f.path)}</span>
                     </span>
                   </td>

@@ -5,12 +5,17 @@ import { Icon, C, type ListIcon } from './Icons.tsx'
 type Props = {
   refs: Ref[]
   stashes: Stash[]
+  onMenu: (r: Ref, x: number, y: number) => void
   onCheckout: (ref: string) => void
   onStashApply: (ref: string) => void
   onStashDrop: (ref: string) => void
 }
 
-export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop }: Props) {
+export function Branches({ refs, stashes, onMenu, onCheckout, onStashApply, onStashDrop }: Props) {
+  const menu = (r: Ref) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    onMenu(r, e.clientX, e.clientY)
+  }
   const local = refs.filter((r) => r.kind === 'local')
   const tags = refs.filter((r) => r.kind === 'tag')
   const remotes = [...new Set(refs.filter((r) => r.kind === 'remote').map((r) => r.remote))].sort()
@@ -23,6 +28,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
             key={r.name}
             icon="branch"
             color={r.current ? C.green : undefined}
+            onContextMenu={menu(r)}
             onDoubleClick={() => !r.current && onCheckout(r.name)}
             title={`Double-click to check out ${r.name}`}
           >
@@ -40,6 +46,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
               <Row
                 key={r.name}
                 icon="remote"
+                onContextMenu={menu(r)}
                 onDoubleClick={() => onCheckout(r.name.slice(rm.length + 1))}
                 title={`Double-click to check out ${r.name}`}
               >
@@ -53,7 +60,7 @@ export function Branches({ refs, stashes, onCheckout, onStashApply, onStashDrop 
       {!!tags.length && (
         <Node title="Tags" count={tags.length}>
           {tags.map((r) => (
-            <Row key={r.name} icon="tag" color={C.orange} onDoubleClick={() => onCheckout(r.name)}>
+            <Row key={r.name} icon="tag" color={C.orange} onContextMenu={menu(r)} onDoubleClick={() => onCheckout(r.name)}>
               <span className="text-ref">{r.name}</span>
             </Row>
           ))}
