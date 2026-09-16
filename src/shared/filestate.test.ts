@@ -38,6 +38,13 @@ test('state: both halves of the code are reported', () => {
   assert.equal(state(f('.', '.')), 'Unchanged')
 })
 
+test('state: a file from a past commit is never "Staged" anything', () => {
+  assert.equal(state(f('M', '.'), true), 'Modified')
+  assert.equal(state(f('A', '.'), true), 'Added')
+  assert.equal(state(f('D', '.'), true), 'Deleted')
+  assert.equal(state(f('R', '.', 'renamed'), true), 'Renamed')
+})
+
 test('isStaged ignores the untracked and ignored markers', () => {
   assert.equal(isStaged(f('M', '.')), true)
   assert.equal(isStaged(f('.', 'M')), false)

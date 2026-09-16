@@ -114,7 +114,7 @@ export function FileCompare({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[1.45]">
+        <div className="select-text min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[1.45]">
           {err && <div className="p-3 text-rose-700">{err}</div>}
           {!cmp && !err && <div className="p-3 text-muted">Loading…</div>}
           {cmp?.binary && <div className="p-3 text-muted">Binary file — nothing to compare.</div>}

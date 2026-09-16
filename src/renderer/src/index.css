@@ -26,6 +26,16 @@ body {
   color: var(--color-fg);
   font: 13px/1.5 'Inter', system-ui, sans-serif;
   overflow: hidden;
+  /* Desktop chrome: dragging across rows must not paint the whole UI blue,
+     and Ctrl+A belongs to the file list, not to the document. */
+  user-select: none;
+}
+
+/* ...except where reading and copying the text is the whole point */
+input,
+textarea,
+.select-text {
+  user-select: text;
 }
 
 /* Native-app density: thin scrollbars everywhere, like SmartGit's panes. */

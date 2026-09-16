@@ -79,6 +79,8 @@ handle('git:stashSave', (cwd: string, msg: string) => G.stashSave(cwd, msg))
 handle('git:stashApply', (cwd: string, ref: string) => G.stashApply(cwd, ref))
 handle('git:stashDrop', (cwd: string, ref: string) => G.stashDrop(cwd, ref))
 handle('git:repoBrief', (cwd: string) => G.repoBrief(cwd))
+handle('git:commitFiles', (cwd: string, sha: string) => G.commitFiles(cwd, sha))
+handle('git:commitDiff', (cwd: string, sha: string, path: string) => G.commitDiff(cwd, sha, path))
 handle('git:showCommit', (cwd: string, sha: string) => G.showCommit(cwd, sha))
 
 handle('sys:openPath', async (cwd: string, path: string) => {

@@ -10,7 +10,8 @@ export function Files({
   sel,
   onSelect,
   onCompare,
-  onMenu
+  onMenu,
+  history = false
 }: {
   files: FileStatus[]
   sel: Set<string>
@@ -18,11 +19,19 @@ export function Files({
   onSelect: (path: string, extend: boolean) => void
   onCompare: (f: FileStatus) => void
   onMenu: (f: FileStatus, x: number, y: number) => void
+  /** showing a past commit: nothing here is staged, it already happened */
+  history?: boolean
 }) {
   if (!files.length) return <div className="p-2 text-muted">Working tree clean</div>
 
   return (
-    <table className="w-full table-fixed border-collapse">
+    // Focusable so clicking a row moves the keyboard out of the File Filter.
+    // A <tr> cannot take focus itself, and without this Ctrl+A keeps landing in
+    // the filter box and looks like it does nothing.
+    <table
+      tabIndex={0}
+      onMouseDown={(e) => e.currentTarget.focus()}
+      className="w-full table-fixed border-collapse outline-none">
       <thead className="sticky top-0 z-10">
         <tr className="bg-panel text-left text-muted">
           <Th className="w-[40%]">Name</Th>
@@ -33,7 +42,7 @@ export function Files({
       <tbody>
         {files.map((f) => {
           const on = sel.has(f.path)
-          const staged = isStaged(f)
+          const staged = !history && isStaged(f)
           const conflict = f.kind === 'unmerged'
           return (
             <tr
@@ -57,7 +66,9 @@ export function Files({
                   <span className="truncate">{base(f.path)}</span>
                 </span>
               </Td>
-              <Td className={conflict ? 'font-medium text-rose-700' : 'text-muted'}>{state(f)}</Td>
+              <Td className={conflict ? 'font-medium text-rose-700' : 'text-muted'}>
+                {state(f, history)}
+              </Td>
               <Td className="text-muted">{dir(f.path)}</Td>
             </tr>
           )

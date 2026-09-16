@@ -13,6 +13,7 @@ import { Console } from './components/Console.tsx'
 import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
+import { CommitDetail } from './components/CommitDetail.tsx'
 import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 
@@ -162,6 +163,22 @@ export default function App() {
   // Only what is on screen can be staged or discarded — a hidden or filtered-out
   // file must never be acted on from a selection the user can no longer see.
   const picked = useMemo(() => files.filter((f) => sel.has(f.path)), [files, sel])
+
+  // Ctrl+A selects every file the list is currently showing, so Stage / Discard
+  // and the commit dialog can act on the lot.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'a') return
+      // inside a text field Ctrl+A still has to mean "select this text"
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable]')) return
+      if (modal || compare || prompt) return // a dialog owns the keyboard
+      e.preventDefault()
+      setSel(new Set(files.map((f) => f.path)))
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [files, modal, compare, prompt])
+
   const staged = useMemo(() => (st?.files ?? []).filter(isStaged), [st])
 
   // Diff follows the single-file selection; a commit selection wins the tab.
@@ -208,6 +225,7 @@ export default function App() {
 
   const copy = (t: string) => run(() => must(api.copy(t)))
 
+
   /** Create a branch and switch to it. `start` omitted means "from HEAD". */
   const newBranch = (start?: string) =>
     setPrompt({
@@ -227,6 +245,11 @@ export default function App() {
     const many = n > 1 ? ` ${n} files` : ''
     const untracked = target.filter((t) => t.kind === 'untracked').map((t) => t.path)
     const tracked = paths.filter((p) => !untracked.includes(p))
+    const copies: MenuItem[] = [
+      { label: 'Copy Name', onClick: () => copy(target.map((t) => t.path.split('/').pop()).join('\n')) },
+      { label: 'Copy Relative Path', onClick: () => copy(paths.join('\n')) },
+      { label: 'Copy Full Path', onClick: () => copy(paths.map((p) => `${cwd}/${p}`).join('\n')) }
+    ]
 
     setMenu({
       x,
@@ -269,9 +292,7 @@ export default function App() {
         { label: 'Open File', onClick: () => run(() => must(api.openPath(cwd!, f.path))), disabled: n > 1 },
         { label: 'Reveal in File Manager', onClick: () => run(() => must(api.reveal(cwd!, f.path))), disabled: n > 1 },
         'sep',
-        { label: 'Copy Name', onClick: () => copy(target.map((t) => t.path.split('/').pop()).join('\n')) },
-        { label: 'Copy Relative Path', onClick: () => copy(paths.join('\n')) },
-        { label: 'Copy Full Path', onClick: () => copy(paths.map((p) => `${cwd}/${p}`).join('\n')) }
+        ...copies
       ]
     })
   }
@@ -488,6 +509,11 @@ export default function App() {
               }
               right={
                 <>
+                  {!!sel.size && (
+                    <span className="text-accent">
+                      {sel.size} selected
+                    </span>
+                  )}
                   {!!nHidden && <span className="text-muted">{nHidden} hidden</span>}
                   <input
                     value={filter}
@@ -573,13 +599,7 @@ export default function App() {
               <Journal
                 commits={commits}
                 sel={commitSel}
-                onSelect={(sha) =>
-                  run(async () => {
-                    setCommitSel(sha)
-                    setDiff(await must(api.showCommit(cwd!, sha)))
-                    setBottom('diff')
-                  })
-                }
+                onSelect={setCommitSel}
               />
             )}
             {bottom === 'diff' &&
@@ -588,6 +608,14 @@ export default function App() {
           </Pane>
         </div>
       </div>
+
+      {commitSel && cwd && commits.some((c) => c.hash === commitSel) && (
+        <CommitDetail
+          cwd={cwd}
+          commit={commits.find((c) => c.hash === commitSel)!}
+          onClose={() => setCommitSel(null)}
+        />
+      )}
 
       {compare && cwd && (
         <FileCompare

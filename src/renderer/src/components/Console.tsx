@@ -17,7 +17,7 @@ export function Console({ cmds }: { cmds: GitCmd[] }) {
     return <div className="p-2 text-muted">No commands yet — every git call shows up here.</div>
 
   return (
-    <div className="p-1 font-mono text-[12px] leading-[1.45]">
+    <div className="select-text p-1 font-mono text-[12px] leading-[1.45]">
       {cmds.map((c) => (
         <div key={c.id} className="px-1">
           <div className="flex gap-2">

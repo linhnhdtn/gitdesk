@@ -352,6 +352,41 @@ export async function repoBrief(cwd: string) {
   return { cwd, name: cwd.split('/').filter(Boolean).pop() ?? cwd, branch, dirty }
 }
 
+/**
+ * Files touched by one commit.
+ *
+ * `-m --first-parent` is the whole trick: a merged pull request IS a merge
+ * commit, and for those git reports NO files at all by default. First-parent
+ * means "what this merge brought into the branch", which is what the journal
+ * is asking. It is also correct for ordinary and root commits.
+ */
+export async function commitFiles(cwd: string, sha: string): Promise<FileStatus[]> {
+  const raw = await git(cwd, [
+    'show',
+    '-m',
+    '--first-parent',
+    '--name-status',
+    '-M',
+    '-z',
+    '--format=',
+    sha
+  ])
+  // NUL-separated: "M\0path\0", and for a rename "R100\0old\0new\0"
+  const rec = raw.split('\0').filter((r) => r.length > 0)
+  const out: FileStatus[] = []
+  for (let i = 0; i < rec.length; i++) {
+    const code = rec[i][0]
+    if (code === 'R' || code === 'C')
+      out.push({ x: code, y: '.', origPath: rec[++i], path: rec[++i], kind: 'renamed' })
+    else out.push({ x: code, y: '.', path: rec[++i], kind: 'ordinary' })
+  }
+  return out
+}
+
+/** One file's patch inside a commit — same first-parent rule as commitFiles. */
+export const commitDiff = (cwd: string, sha: string, path: string) =>
+  git(cwd, ['show', '-m', '--first-parent', '-M', '--format=', sha, '--', path])
+
 /** Full patch for one commit, for the Diff tab when a journal row is clicked. */
 export const showCommit = (cwd: string, sha: string) =>
   git(cwd, ['show', '--stat', '--patch', '--format=fuller', sha])

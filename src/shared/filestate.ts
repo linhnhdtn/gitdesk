@@ -31,8 +31,14 @@ const WORD: Record<string, string> = {
   U: 'Conflict'
 }
 
-/** The words SmartGit puts in its State column. */
-export function state(f: FileStatus): string {
+/**
+ * The words SmartGit puts in its State column.
+ *
+ * `history` = the entry came from a past commit, where the index/worktree split
+ * has no meaning: it is plainly "Modified", never "Staged Modified".
+ */
+export function state(f: FileStatus, history = false): string {
+  if (history) return WORD[f.x] ?? f.x
   if (f.kind === 'untracked') return 'Untracked'
   if (f.kind === 'ignored') return 'Ignored'
   if (f.kind === 'unmerged') return 'Conflict'

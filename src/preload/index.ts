@@ -47,6 +47,10 @@ export const api = {
   stashDrop: (cwd: string, ref: string) => call<string>('git:stashDrop', cwd, ref),
   repoBrief: (cwd: string) =>
     call<{ cwd: string; name: string; branch: string; dirty: boolean }>('git:repoBrief', cwd),
+  commitFiles: (cwd: string, sha: string) =>
+    call<import('../main/git.ts').FileStatus[]>('git:commitFiles', cwd, sha),
+  commitDiff: (cwd: string, sha: string, path: string) =>
+    call<string>('git:commitDiff', cwd, sha, path),
   showCommit: (cwd: string, sha: string) => call<string>('git:showCommit', cwd, sha),
 
   /** Main->renderer push (the only one). Returns an unsubscribe for useEffect cleanup. */
