@@ -84,9 +84,9 @@ export function FileCompare({
     <div className="fixed inset-0 z-50 flex justify-center bg-black/30 p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[1600px] min-h-0 flex-col rounded border border-line bg-bg shadow-2xl"
+        className="flex w-full max-w-[1600px] min-h-0 flex-col rounded-xl border border-line bg-bg shadow-2xl"
       >
-        <div className="flex shrink-0 items-center gap-2 rounded-t border-b border-line bg-panel px-3 py-1.5">
+        <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-line bg-panel px-3 py-1.5">
           <span className="truncate font-semibold">[{file.path}] — File Compare</span>
           <button onClick={onClose} className="ml-auto rounded px-2 hover:bg-line" title="Close (Esc)">
             ✕
@@ -114,7 +114,7 @@ export function FileCompare({
           </div>
         </div>
 
-        <div className="select-text min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-[1.45]">
+        <div className="select-text min-h-0 flex-1 overflow-auto font-mono text-[13px] leading-[1.45]">
           {err && <div className="p-3 text-rose-700">{err}</div>}
           {!cmp && !err && <div className="p-3 text-muted">Loading…</div>}
           {cmp?.binary && <div className="p-3 text-muted">Binary file — nothing to compare.</div>}

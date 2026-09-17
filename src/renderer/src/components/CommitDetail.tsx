@@ -8,13 +8,15 @@ import type { Commit, FileStatus } from '../../../main/git.ts'
 /** What one commit changed: its files on the left, the selected file's patch on the right. */
 export function CommitDetail({
   cwd,
-  commit,
+  refName,
   onClose
 }: {
   cwd: string
-  commit: Commit
+  /** a sha, or a stash entry like stash@{0} — both resolve to one commit */
+  refName: string
   onClose: () => void
 }) {
+  const [commit, setCommit] = useState<Commit | null>(null)
   const [files, setFiles] = useState<FileStatus[] | null>(null)
   const [sel, setSel] = useState<string | null>(null)
   const [diff, setDiff] = useState('')
@@ -29,42 +31,47 @@ export function CommitDetail({
 
   useEffect(() => {
     let dead = false
+    setCommit(null)
     setFiles(null)
     setSel(null)
     setDiff('')
-    must(api.commitFiles(cwd, commit.hash))
-      .then((f) => {
+    Promise.all([must(api.commitAt(cwd, refName)), must(api.commitFiles(cwd, refName))])
+      .then(([c, f]) => {
         if (dead) return
+        setCommit(c)
         setFiles(f)
         // land on something readable instead of an empty pane
         if (f.length) setSel(f[0].path)
       })
       .catch((e) => !dead && setErr(String(e.message ?? e)))
     return () => void (dead = true)
-  }, [cwd, commit.hash])
+  }, [cwd, refName])
 
   useEffect(() => {
     if (!sel) return setDiff('')
     let dead = false
-    must(api.commitDiff(cwd, commit.hash, sel))
+    must(api.commitDiff(cwd, refName, sel))
       .then((d) => !dead && setDiff(d))
       .catch((e) => !dead && setErr(String(e.message ?? e)))
     return () => void (dead = true)
-  }, [cwd, commit.hash, sel])
+  }, [cwd, refName, sel])
 
-  const merge = commit.parents.length > 1
+  const merge = (commit?.parents.length ?? 0) > 1
+  const stash = refName.startsWith('stash@{')
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center bg-black/30 p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[1600px] min-h-0 flex-col rounded border border-line bg-bg shadow-2xl"
+        className="flex w-full max-w-[1600px] min-h-0 flex-col rounded-xl border border-line bg-bg shadow-2xl"
       >
-        <div className="flex shrink-0 items-center gap-2 rounded-t border-b border-line bg-panel px-3 py-1.5">
-          <span className="shrink-0 font-mono text-muted">{commit.hash.slice(0, 7)}</span>
-          <span className="truncate font-semibold">{commit.subject}</span>
-          {merge && (
-            <span className="shrink-0 rounded bg-accent/15 px-1.5 text-[11px] text-accent">merge</span>
+        <div className="flex shrink-0 items-center gap-2 rounded-t-xl border-b border-line bg-panel px-3 py-1.5">
+          <span className="shrink-0 font-mono text-muted">
+            {stash ? refName : (commit?.hash.slice(0, 7) ?? '…')}
+          </span>
+          <span className="truncate font-semibold">{commit?.subject ?? 'Loading…'}</span>
+          {merge && !stash && (
+            <span className="shrink-0 rounded bg-accent/15 px-1.5 text-[12px] text-accent">merge</span>
           )}
           <button onClick={onClose} className="ml-auto rounded px-2 hover:bg-line" title="Close (Esc)">
             ✕
@@ -73,17 +80,17 @@ export function CommitDetail({
 
         <div className="flex shrink-0 gap-3 border-b border-line bg-panel px-3 py-1 text-muted">
           <span className="truncate">
-            {commit.author} &lt;{commit.email}&gt;
+            {commit ? `${commit.author} <${commit.email}>` : ''}
           </span>
-          <span className="shrink-0">{commit.date.slice(0, 16).replace('T', ' ')}</span>
+          <span className="shrink-0">{commit?.date.slice(0, 16).replace('T', ' ')}</span>
           <span className="ml-auto shrink-0">
             {files ? `${files.length} file${files.length === 1 ? '' : 's'}` : 'loading…'}
-            {merge && ' vs first parent'}
+            {merge && !stash && ' vs first parent'}
           </span>
         </div>
 
         {err && (
-          <pre className="shrink-0 border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[12px] whitespace-pre-wrap text-rose-700">
+          <pre className="shrink-0 border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[13px] whitespace-pre-wrap text-rose-700">
             {err}
           </pre>
         )}
@@ -93,7 +100,11 @@ export function CommitDetail({
             {files === null && <div className="p-2 text-muted">Loading…</div>}
             {files?.length === 0 && (
               <div className="p-2 text-muted">
-                {merge ? 'This merge brought in no changes.' : 'This commit changed nothing.'}
+                {stash
+                  ? 'This stash holds no changes.'
+                  : merge
+                    ? 'This merge brought in no changes.'
+                    : 'This commit changed nothing.'}
               </div>
             )}
             {!!files?.length && (

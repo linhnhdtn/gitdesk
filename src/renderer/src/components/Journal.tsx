@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import type { Commit } from '../../../main/git.ts'
 import { lanes } from '../../../shared/graph.ts'
 
-const ROW = 22
-const LANE = 14
+const ROW = 25
+const LANE = 15
 const COLORS = ['#2a6099', '#2e7d32', '#b26a00', '#8e24aa', '#00838f', '#c62828']
 const cx = (l: number) => l * LANE + LANE / 2
 
@@ -99,7 +99,7 @@ export function Journal({
             {decorations(c.refs).map((d) => (
               <span
                 key={d.kind + d.name}
-                className={`shrink-0 rounded-sm px-1 text-[11px] leading-[15px] font-medium ${BADGE[d.kind]}`}
+                className={`shrink-0 rounded-sm px-1.5 text-[12px] leading-[17px] font-medium ${BADGE[d.kind]}`}
               >
                 {d.name}
               </span>

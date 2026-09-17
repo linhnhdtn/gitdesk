@@ -60,7 +60,7 @@ export function Pane({
 }) {
   return (
     <section className={`flex min-h-0 min-w-0 flex-col ${className}`}>
-      <div className="flex h-7 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
+      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
         <span className="truncate font-medium">{title}</span>
         <div className="ml-auto flex shrink-0 items-center gap-1">{right}</div>
       </div>

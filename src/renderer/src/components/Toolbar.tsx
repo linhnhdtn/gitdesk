@@ -37,9 +37,9 @@ function ToolBtn({ label, icon, onClick, disabled, title, badge, active }: Item)
       }`}
     >
       <Icon name={icon} size={22} />
-      <span className="w-full truncate text-[11px]">{label}</span>
+      <span className="w-full truncate text-[12px]">{label}</span>
       {badge != null && badge !== 0 && (
-        <span className="absolute top-0.5 right-1.5 rounded-full bg-accent px-1 text-[9px] font-bold text-white">
+        <span className="absolute top-0.5 right-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
           {badge}
         </span>
       )}

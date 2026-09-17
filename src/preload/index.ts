@@ -39,14 +39,18 @@ export const api = {
   push: (cwd: string, force = false) => call<string>('git:push', cwd, force),
   refs: (cwd: string) => call<import('../main/git.ts').Ref[]>('git:refs', cwd),
   checkout: (cwd: string, ref: string) => call<string>('git:checkout', cwd, ref),
-  discard: (cwd: string, paths: string[], untracked: string[] = []) =>
-    call<string>('git:discard', cwd, paths, untracked),
+  discard: (cwd: string, tracked: string[], untracked: string[] = [], toHead = false) =>
+    call<string>('git:discard', cwd, tracked, untracked, toHead),
   stashList: (cwd: string) => call<import('../main/git.ts').Stash[]>('git:stashList', cwd),
-  stashSave: (cwd: string, msg = '') => call<string>('git:stashSave', cwd, msg),
+  stashSave: (cwd: string, msg = '', paths: string[] = []) =>
+    call<string>('git:stashSave', cwd, msg, paths),
   stashApply: (cwd: string, ref: string) => call<string>('git:stashApply', cwd, ref),
   stashDrop: (cwd: string, ref: string) => call<string>('git:stashDrop', cwd, ref),
   repoBrief: (cwd: string) =>
     call<{ cwd: string; name: string; branch: string; dirty: boolean }>('git:repoBrief', cwd),
+  commitAt: (cwd: string, ref: string) => call<import('../main/git.ts').Commit>('git:commitAt', cwd, ref),
+  renameStash: (cwd: string, ref: string, msg: string) =>
+    call<string>('git:renameStash', cwd, ref, msg),
   commitFiles: (cwd: string, sha: string) =>
     call<import('../main/git.ts').FileStatus[]>('git:commitFiles', cwd, sha),
   commitDiff: (cwd: string, sha: string, path: string) =>

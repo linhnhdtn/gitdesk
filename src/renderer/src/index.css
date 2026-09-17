@@ -24,7 +24,7 @@ body,
 body {
   background: var(--color-panel);
   color: var(--color-fg);
-  font: 13px/1.5 'Inter', system-ui, sans-serif;
+  font: 14px/1.55 'Inter', system-ui, sans-serif;
   overflow: hidden;
   /* Desktop chrome: dragging across rows must not paint the whole UI blue,
      and Ctrl+A belongs to the file list, not to the document. */

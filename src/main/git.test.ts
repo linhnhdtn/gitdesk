@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseStatusV2, commitArgs } from './git.ts'
+import { parseStatusV2, commitArgs, parseStash } from './git.ts'
 
 // -z output: records joined by NUL. Rename entries put origPath in the NEXT record.
 const sample = [
@@ -87,4 +87,26 @@ test('commitArgs: a path that looks like a flag stays a path', () => {
   // it sits after --, so git cannot read it as an option
   const a = commitArgs('m', { paths: ['--amend'] })
   assert.equal(a.indexOf('--amend'), a.indexOf('--') + 1)
+})
+
+test('parseStash: a user title is separated from the branch', () => {
+  const s = parseStash('stash@{0}', 'On main: my title', '2026-09-16T16:55:31+07:00')
+  assert.equal(s.branch, 'main')
+  assert.equal(s.message, 'my title')
+})
+
+test('parseStash: a message-less stash drops the WIP sha', () => {
+  const s = parseStash('stash@{1}', 'WIP on main: 93e730d init', '')
+  assert.equal(s.branch, 'main')
+  assert.equal(s.message, 'init', 'the bare sha is noise in a sidebar')
+})
+
+test('parseStash: a branch name with a slash survives', () => {
+  assert.equal(parseStash('stash@{0}', 'On feature/login: wip', '').branch, 'feature/login')
+})
+
+test('parseStash: an unrecognised subject is passed through, not dropped', () => {
+  const s = parseStash('stash@{0}', 'something else entirely', '')
+  assert.equal(s.message, 'something else entirely')
+  assert.equal(s.branch, '')
 })

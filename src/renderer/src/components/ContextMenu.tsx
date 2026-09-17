@@ -53,7 +53,7 @@ export function ContextMenu({
       ref={box}
       style={{ left: pos.left, top: pos.top, visibility: pos.ready ? 'visible' : 'hidden' }}
       onContextMenu={(e) => e.preventDefault()}
-      className="fixed z-[60] min-w-52 rounded border border-line bg-panel py-1 shadow-xl"
+      className="fixed z-[60] min-w-52 rounded-lg border border-line bg-panel py-1.5 shadow-xl"
     >
       {items.map((it, i) =>
         it === 'sep' ? (
@@ -116,7 +116,7 @@ export function Prompt({
           const v = box.current?.value.trim()
           if (v) onOk(v)
         }}
-        className="w-[460px] max-w-full rounded border border-line bg-panel shadow-2xl"
+        className="w-[460px] max-w-full rounded-xl border border-line bg-panel shadow-2xl"
       >
         <div className="border-b border-line px-3 py-1.5 text-center font-semibold">{title}</div>
         <div className="p-4">
@@ -128,17 +128,17 @@ export function Prompt({
             // only tracks whether the field is blank, for the submit button
             onInput={(e) => setEmpty(!e.currentTarget.value.trim())}
             onFocus={(e) => e.currentTarget.select()}
-            className="w-full rounded border border-line bg-bg px-2 py-1 outline-none focus:border-accent"
+            className="w-full rounded-md border border-line bg-bg px-2 py-1 outline-none focus:border-accent"
           />
         </div>
         <div className="flex justify-end gap-2 px-4 pb-3">
-          <button type="button" onClick={onCancel} className="rounded border border-line bg-bg px-4 py-1 hover:border-accent">
+          <button type="button" onClick={onCancel} className="rounded-md border border-line bg-bg px-4 py-1 hover:border-accent">
             Cancel
           </button>
           <button
             type="submit"
             disabled={empty}
-            className="rounded border border-line bg-bg px-4 py-1 hover:border-accent hover:text-accent disabled:opacity-40"
+            className="rounded-md border border-line bg-bg px-4 py-1 hover:border-accent hover:text-accent disabled:opacity-40"
           >
             {confirmLabel}
           </button>

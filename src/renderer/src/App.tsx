@@ -14,6 +14,8 @@ import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
 import { CommitDetail } from './components/CommitDetail.tsx'
+import { DiscardDialog } from './components/DiscardDialog.tsx'
+import { StashDialog } from './components/StashDialog.tsx'
 import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 
@@ -61,7 +63,7 @@ export default function App() {
   })
 
   const [diff, setDiff] = useState('')
-  const [modal, setModal] = useState<'commit' | null>(null)
+  const [modal, setModal] = useState<'commit' | 'discard' | 'stash' | null>(null)
   const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
@@ -276,8 +278,8 @@ export default function App() {
           label: `Discard…${many}`,
           danger: true,
           onClick: () => {
-            if (!window.confirm(`Discard local changes in ${n} file(s)?\n\n${paths.join('\n')}`)) return
-            act(() => must(api.discard(cwd!, tracked, untracked)).then(() => setSel(new Set())))
+            setSel(new Set(paths))
+            setModal('discard')
           }
         },
         {
@@ -355,6 +357,41 @@ export default function App() {
     })
   }
 
+  /** Right-click on a stash. Nothing here fires from a plain click any more. */
+  function stashMenu(st: Stash, x: number, y: number) {
+    setMenu({
+      x,
+      y,
+      items: [
+        { label: 'Apply Stash…', onClick: () => act(() => must(api.stashApply(cwd!, st.ref))) },
+        { label: 'Show Content…', onClick: () => setCommitSel(st.ref) },
+        'sep',
+        {
+          label: 'Rename Stash…',
+          onClick: () =>
+            setPrompt({
+              title: 'Rename Stash',
+              label: `New title for ${st.ref}`,
+              initial: st.message,
+              confirmLabel: 'Rename',
+              // git has no rename, so the entry is re-stored and moves to the top
+              onOk: (v) => act(() => must(api.renameStash(cwd!, st.ref, v)))
+            })
+        },
+        {
+          label: 'Drop Stash…',
+          danger: true,
+          onClick: () => {
+            if (!window.confirm(`Drop ${st.ref}?\n\n${st.message}\n\nThis cannot be undone.`)) return
+            act(() => must(api.stashDrop(cwd!, st.ref)))
+          }
+        },
+        'sep',
+        { label: 'Copy Message', onClick: () => copy(st.message) }
+      ]
+    })
+  }
+
   const groups: Item[][] = [
     [
       { label: 'Fetch', icon: 'fetch', onClick: at((c) => must(api.fetch(c))), disabled: busy },
@@ -392,16 +429,8 @@ export default function App() {
         label: 'Discard',
         icon: 'discard',
         disabled: busy || !picked.length,
-        title: 'Throw away worktree changes in the selected files',
-        onClick: () => {
-          const names = picked.map((f) => f.path)
-          // Destructive and unrecoverable — always confirm, however lazy the rest is.
-          if (!window.confirm(`Discard local changes in ${names.length} file(s)?\n\n${names.join('\n')}`))
-            return
-          const untracked = picked.filter((f) => f.kind === 'untracked').map((f) => f.path)
-          const tracked = names.filter((p) => !untracked.includes(p))
-          act(() => must(api.discard(cwd!, tracked, untracked)).then(() => setSel(new Set())))
-        }
+        title: 'Throw away changes in the selected files…',
+        onClick: () => setModal('discard')
       }
     ],
     [
@@ -409,7 +438,8 @@ export default function App() {
         label: 'Stash',
         icon: 'stash',
         disabled: busy || !st?.files.length,
-        onClick: at((c) => must(api.stashSave(c)))
+        title: 'Set changes aside…',
+        onClick: () => setModal('stash')
       },
       {
         label: 'Apply',
@@ -439,7 +469,7 @@ export default function App() {
         // git errors are multi-line (its `hint:` lines usually carry the fix), and
         // a plain div collapses them into one run-on line. pre keeps them; the cap
         // stops a long one from eating the panes.
-        <pre className="max-h-32 shrink-0 overflow-auto border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[12px] whitespace-pre-wrap text-rose-700">
+        <pre className="max-h-32 shrink-0 overflow-auto border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[13px] whitespace-pre-wrap text-rose-700">
           {err}
         </pre>
       )}
@@ -484,9 +514,8 @@ export default function App() {
               refs={refs}
               stashes={stashes}
               onMenu={refMenu}
+              onStashMenu={stashMenu}
               onCheckout={(r) => act(() => must(api.checkout(cwd!, r)))}
-              onStashApply={(r) => act(() => must(api.stashApply(cwd!, r)))}
-              onStashDrop={(r) => act(() => must(api.stashDrop(cwd!, r)))}
             />
           </Pane>
         </div>
@@ -609,12 +638,8 @@ export default function App() {
         </div>
       </div>
 
-      {commitSel && cwd && commits.some((c) => c.hash === commitSel) && (
-        <CommitDetail
-          cwd={cwd}
-          commit={commits.find((c) => c.hash === commitSel)!}
-          onClose={() => setCommitSel(null)}
-        />
+      {commitSel && cwd && (
+        <CommitDetail cwd={cwd} refName={commitSel} onClose={() => setCommitSel(null)} />
       )}
 
       {compare && cwd && (
@@ -632,6 +657,25 @@ export default function App() {
           {...prompt}
           onCancel={() => setPrompt(null)}
           onOk={(v) => (setPrompt(null), prompt.onOk(v))}
+        />
+      )}
+
+      {modal === 'stash' && cwd && st && !!st.files.length && (
+        <StashDialog
+          cwd={cwd}
+          files={st.files}
+          branch={st.branch}
+          onClose={() => setModal(null)}
+          onDone={() => (setModal(null), setSel(new Set()), act(async () => {}))}
+        />
+      )}
+
+      {modal === 'discard' && cwd && !!picked.length && (
+        <DiscardDialog
+          cwd={cwd}
+          files={picked}
+          onClose={() => setModal(null)}
+          onDone={() => (setModal(null), setSel(new Set()), act(async () => {}))}
         />
       )}
 

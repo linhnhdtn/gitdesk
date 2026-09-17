@@ -95,6 +95,9 @@ const LIST: Record<string, React.ReactNode> = {
       <path d="M13.4 8c0 1.1-2.4 2-5.4 2s-5.4-.9-5.4-2" stroke={C.tan} />
     </>
   ),
+  /** the checked-out branch — a plain solid arrowhead, the one marker that still
+      reads at 13px where any outlined glyph turns to mush */
+  head: <path d="M3.8 1.9l8.6 6.1-8.6 6.1z" fill="currentColor" stroke="none" />,
   branch: (
     <>
       <circle cx="4.5" cy="3.4" r="1.7" />
@@ -218,6 +221,8 @@ export function Icon({
       strokeWidth={big ? 1.7 : 1.2}
       strokeLinecap="round"
       strokeLinejoin="round"
+      // so a filled path's currentColor matches the stroke colour too
+      style={color ? { color } : undefined}
       className={`shrink-0 ${className}`}
       aria-hidden
     >

@@ -6,12 +6,11 @@ type Props = {
   refs: Ref[]
   stashes: Stash[]
   onMenu: (r: Ref, x: number, y: number) => void
+  onStashMenu: (s: Stash, x: number, y: number) => void
   onCheckout: (ref: string) => void
-  onStashApply: (ref: string) => void
-  onStashDrop: (ref: string) => void
 }
 
-export function Branches({ refs, stashes, onMenu, onCheckout, onStashApply, onStashDrop }: Props) {
+export function Branches({ refs, stashes, onMenu, onStashMenu, onCheckout }: Props) {
   const menu = (r: Ref) => (e: React.MouseEvent) => {
     e.preventDefault()
     onMenu(r, e.clientX, e.clientY)
@@ -26,11 +25,12 @@ export function Branches({ refs, stashes, onMenu, onCheckout, onStashApply, onSt
         {local.map((r) => (
           <Row
             key={r.name}
-            icon="branch"
+            icon={r.current ? 'head' : 'branch'}
             color={r.current ? C.green : undefined}
+            active={r.current}
             onContextMenu={menu(r)}
             onDoubleClick={() => !r.current && onCheckout(r.name)}
-            title={`Double-click to check out ${r.name}`}
+            title={r.current ? `${r.name} is checked out` : `Double-click to check out ${r.name}`}
           >
             <span className={r.current ? 'font-semibold text-accent' : ''}>{r.name}</span>
             {r.upstream && <span className="text-muted"> = {r.upstream}</span>}
@@ -67,17 +67,24 @@ export function Branches({ refs, stashes, onMenu, onCheckout, onStashApply, onSt
         </Node>
       )}
 
-      <Node title="Stashes" count={stashes.length}>
+      {/* open by default: a stash you cannot see is a stash you forget */}
+      <Node title="Stashes" count={stashes.length} open>
         {stashes.map((s) => (
-          <Row key={s.ref} icon="drawer" onDoubleClick={() => onStashApply(s.ref)} title="Double-click to apply">
-            <span className="text-muted">{s.ref}</span> {s.subject}
-            <button
-              onClick={(e) => (e.stopPropagation(), onStashDrop(s.ref))}
-              className="ml-1 rounded px-1 text-muted hover:bg-line hover:text-rose-700"
-              title="Drop stash"
-            >
-              ✕
-            </button>
+          <Row
+            key={s.ref}
+            icon="drawer"
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onStashMenu(s, e.clientX, e.clientY)
+            }}
+            title={`${s.subject}${s.date ? `\n${s.date.slice(0, 16).replace('T', ' ')}` : ''}\nRight-click for actions`}
+          >
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              {/* the title is what the user typed, so it gets the room; the
+                  branch gives way first and the date lives in the tooltip */}
+              <span className="min-w-0 flex-1 truncate">{s.message}</span>
+              <span className="min-w-0 shrink truncate text-[12px] text-muted">{s.branch}</span>
+            </span>
           </Row>
         ))}
       </Node>
@@ -116,11 +123,22 @@ function Row({
   children,
   icon,
   color,
+  active,
   ...p
-}: React.HTMLAttributes<HTMLDivElement> & { icon: ListIcon; color?: string }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  icon: ListIcon
+  color?: string
+  /** the checked-out branch, tinted so it is findable in a long list */
+  active?: boolean
+}) {
   return (
-    <div {...p} className="flex cursor-default items-center gap-1.5 py-[2px] pr-2 pl-6 hover:bg-panel">
-      <Icon name={icon} color={color} size={13} className="opacity-80" />
+    <div
+      {...p}
+      className={`flex cursor-default items-center gap-1.5 py-[3px] pr-2 pl-6 ${
+        active ? 'bg-accent/10' : 'hover:bg-panel'
+      }`}
+    >
+      <Icon name={icon} color={color} size={13} className={active ? '' : 'opacity-80'} />
       <span className="min-w-0 truncate">{children}</span>
     </div>
   )

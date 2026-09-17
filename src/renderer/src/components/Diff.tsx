@@ -3,7 +3,7 @@ export function Diff({ text }: { text: string }) {
   if (!text.trim()) return <Empty>No changes to show</Empty>
 
   return (
-    <pre className="select-text h-full overflow-auto font-mono text-[12px] leading-[1.45]">
+    <pre className="select-text h-full overflow-auto font-mono text-[13px] leading-[1.45]">
       {text.split('\n').map((line, i) => {
         const c = line[0]
         const cls =

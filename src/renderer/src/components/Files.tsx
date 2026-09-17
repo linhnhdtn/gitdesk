@@ -82,5 +82,5 @@ const Th = ({ className = '', children }: { className?: string; children: React.
   <th className={`truncate border-b border-line px-2 py-1 font-medium ${className}`}>{children}</th>
 )
 const Td = ({ className = '', children }: { className?: string; children: React.ReactNode }) => (
-  <td className={`truncate px-2 py-[2px] ${className}`}>{children}</td>
+  <td className={`truncate px-2 py-[3px] ${className}`}>{children}</td>
 )

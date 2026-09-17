@@ -103,9 +103,9 @@ export function CommitDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-full w-[640px] max-w-full flex-col rounded border border-line bg-panel shadow-2xl"
+        className="flex max-h-full w-[640px] max-w-full flex-col rounded-xl border border-line bg-panel shadow-2xl"
       >
-        <div className="flex shrink-0 items-center border-b border-line px-3 py-1.5">
+        <div className="flex shrink-0 items-center rounded-t-xl border-b border-line px-3 py-1.5">
           <span className="flex-1 text-center font-semibold">Commit</span>
           <button onClick={onClose} className="rounded px-2 hover:bg-line" title="Close (Esc)">
             ✕
@@ -133,7 +133,7 @@ export function CommitDialog({
           </span>
         </div>
 
-        <div className="mx-4 min-h-[120px] flex-1 overflow-auto rounded border border-line bg-bg">
+        <div className="mx-4 min-h-[120px] flex-1 overflow-auto rounded-md border border-line bg-bg">
           <table className="w-full table-fixed border-collapse">
             <thead className="sticky top-0">
               <tr className="bg-panel text-left text-muted">
@@ -161,14 +161,14 @@ export function CommitDialog({
                   }
                   className="cursor-default hover:bg-panel"
                 >
-                  <td className="truncate px-2 py-[2px]">
+                  <td className="truncate px-2 py-[3px]">
                     <span className="flex items-center gap-1.5">
                       <input type="checkbox" readOnly checked={checked.has(f.path)} className="shrink-0" />
                       <FileIcon category={category(f)} staged={isStaged(f)} />
                       <span className="truncate">{base(f.path)}</span>
                     </span>
                   </td>
-                  <td className="truncate px-2 py-[2px] text-muted">{dir(f.path)}</td>
+                  <td className="truncate px-2 py-[3px] text-muted">{dir(f.path)}</td>
                 </tr>
               ))}
             </tbody>
@@ -176,7 +176,7 @@ export function CommitDialog({
         </div>
 
         {!!willTakeWorktree && !!willTakeWorktree.length && (
-          <p className="mx-4 mt-2 shrink-0 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[12px] text-amber-800">
+          <p className="mx-4 mt-2 shrink-0 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[13px] text-amber-800">
             Naming files makes git commit their <b>working-tree</b> content, not what is staged.{' '}
             {willTakeWorktree.map((f) => base(f.path)).join(', ')} differ — select every file to
             commit the index exactly.
@@ -217,7 +217,7 @@ export function CommitDialog({
         </div>
 
         {err && (
-          <pre className="mx-4 mt-2 shrink-0 max-h-24 overflow-auto rounded border border-rose-300 bg-rose-50 px-2 py-1 font-mono text-[12px] whitespace-pre-wrap text-rose-700">
+          <pre className="mx-4 mt-2 shrink-0 max-h-24 overflow-auto rounded border border-rose-300 bg-rose-50 px-2 py-1 font-mono text-[13px] whitespace-pre-wrap text-rose-700">
             {err}
           </pre>
         )}
@@ -255,7 +255,7 @@ function Btn({ className = '', ...p }: React.ButtonHTMLAttributes<HTMLButtonElem
   return (
     <button
       {...p}
-      className={`rounded border border-line bg-bg px-4 py-1 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:text-fg ${className}`}
+      className={`rounded-md border border-line bg-bg px-4 py-1 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:text-fg ${className}`}
     />
   )
 }

@@ -132,6 +132,16 @@ export type Commit = {
 
 const LOG_FMT = ['%H', '%P', '%an', '%ae', '%aI', '%s', '%D'].join('%x1f') + '%x1e'
 
+function parseCommit(r: string): Commit {
+  const [hash, parents, author, email, date, subject, refs] = r.split('\x1f')
+  return { hash, parents: parents ? parents.split(' ') : [], author, email, date, subject, refs }
+}
+
+/** One commit by any ref — a sha, a branch, or a stash entry. */
+export async function commitAt(cwd: string, ref: string): Promise<Commit> {
+  return parseCommit((await git(cwd, ['log', '-1', `--format=${LOG_FMT}`, ref])).replace(/\x1e[\s\S]*$/, ''))
+}
+
 export async function log(cwd: string, limit = 200, skip = 0, all = true): Promise<Commit[]> {
   const raw = await git(cwd, [
     'log',
@@ -146,18 +156,7 @@ export async function log(cwd: string, limit = 200, skip = 0, all = true): Promi
     .split('\x1e')
     .map((r) => r.replace(/^\n/, ''))
     .filter((r) => r.trim().length > 0)
-    .map((r) => {
-      const [hash, parents, author, email, date, subject, refs] = r.split('\x1f')
-      return {
-        hash,
-        parents: parents ? parents.split(' ') : [],
-        author,
-        email,
-        date,
-        subject,
-        refs
-      }
-    })
+    .map(parseCommit)
 }
 
 /**
@@ -317,30 +316,79 @@ export async function refs(cwd: string): Promise<Ref[]> {
 
 export const checkout = (cwd: string, ref: string) => git(cwd, ['checkout', ref])
 
-export type Stash = { ref: string; subject: string }
+export type Stash = {
+  ref: string
+  /** raw reflog subject, kept so nothing is lost if the parse misses */
+  subject: string
+  /** the title the user typed, or the commit it was taken from */
+  message: string
+  branch: string
+  date: string
+}
+
+/**
+ * git writes two shapes of subject: "On <branch>: <title>" when the user gave
+ * a message, "WIP on <branch>: <sha> <subject>" when they did not. Split them
+ * so the sidebar can show the title on its own line.
+ */
+export function parseStash(ref: string, subject: string, date: string): Stash {
+  const m = /^(WIP on|On) ([^:]+): (.*)$/.exec(subject)
+  if (!m) return { ref, subject, message: subject, branch: '', date }
+  const [, kind, branch, rest] = m
+  const message = kind === 'WIP on' ? rest.replace(/^[0-9a-f]{7,40}\s+/, '') : rest
+  return { ref, subject, message, branch, date }
+}
 
 export async function stashList(cwd: string): Promise<Stash[]> {
-  const raw = await git(cwd, ['stash', 'list', '--format=%gd%x1f%s'])
+  // %gs, not %s: the reflog message is what `git stash list` shows and the only
+  // thing `stash store -m` can change — %s stays frozen at the commit's own
+  // subject, so a renamed stash would still read under its old title.
+  const raw = await git(cwd, ['stash', 'list', '--format=%gd%x1f%gs%x1f%cI'])
   return raw
     .split('\n')
     .filter(Boolean)
     .map((l) => {
-      const [ref, subject] = l.split('\x1f')
-      return { ref, subject }
+      const [ref, subject, date] = l.split('\x1f')
+      return parseStash(ref, subject, date)
     })
 }
 
-export const stashSave = (cwd: string, msg: string) =>
-  git(cwd, ['stash', 'push', '-u', ...(msg ? ['-m', msg] : [])])
+/** With `paths`, only those files are stashed — the rest of the tree is left alone. */
+export const stashSave = (cwd: string, msg = '', paths: string[] = []) =>
+  git(cwd, [
+    'stash',
+    'push',
+    '-u',
+    ...(msg ? ['-m', msg] : []),
+    ...(paths.length ? ['--', ...paths] : [])
+  ])
 export const stashApply = (cwd: string, ref: string) => git(cwd, ['stash', 'apply', ref])
 export const stashDrop = (cwd: string, ref: string) => git(cwd, ['stash', 'drop', ref])
 
 /**
- * Throw away worktree changes. Tracked paths are restored from the index,
- * untracked ones deleted — `restore` alone silently no-ops on untracked files.
+ * Throw away changes.
+ *
+ * `toHead` reverts the index too, so the file ends up exactly as HEAD has it;
+ * otherwise only the worktree is rolled back to whatever is staged. Untracked
+ * files are deleted either way — `restore` silently no-ops on them.
+ *
+ * Note a file staged as NEW is not in HEAD, so reverting it to HEAD removes it
+ * from disk. The dialog says so before it runs.
  */
-export async function discard(cwd: string, paths: string[], untracked: string[] = []) {
-  if (paths.length) await git(cwd, ['restore', '--worktree', '--', ...paths])
+export async function discard(
+  cwd: string,
+  tracked: string[],
+  untracked: string[] = [],
+  toHead = false
+) {
+  if (tracked.length)
+    await git(cwd, [
+      'restore',
+      ...(toHead ? ['--source=HEAD', '--staged'] : []),
+      '--worktree',
+      '--',
+      ...tracked
+    ])
   if (untracked.length) await git(cwd, ['clean', '-fd', '--', ...untracked])
   return ''
 }
@@ -360,18 +408,10 @@ export async function repoBrief(cwd: string) {
  * means "what this merge brought into the branch", which is what the journal
  * is asking. It is also correct for ordinary and root commits.
  */
-export async function commitFiles(cwd: string, sha: string): Promise<FileStatus[]> {
-  const raw = await git(cwd, [
-    'show',
-    '-m',
-    '--first-parent',
-    '--name-status',
-    '-M',
-    '-z',
-    '--format=',
-    sha
-  ])
-  // NUL-separated: "M\0path\0", and for a rename "R100\0old\0new\0"
+const isStashRef = (ref: string) => /^stash@\{\d+\}$/.test(ref)
+
+/** NUL "STATUS\0path\0", and "R100\0old\0new\0" for a rename. */
+function parseNameStatus(raw: string): FileStatus[] {
   const rec = raw.split('\0').filter((r) => r.length > 0)
   const out: FileStatus[] = []
   for (let i = 0; i < rec.length; i++) {
@@ -383,9 +423,60 @@ export async function commitFiles(cwd: string, sha: string): Promise<FileStatus[
   return out
 }
 
+/**
+ * A stash keeps its untracked files in a THIRD parent, outside its own tree,
+ * so they are invisible to a plain first-parent diff. `^3` is absent when the
+ * stash had none, hence the catch.
+ */
+async function stashUntracked(cwd: string, ref: string): Promise<Set<string>> {
+  const raw = await git(cwd, ['ls-tree', '-r', '--name-only', '-z', `${ref}^3`]).catch(() => '')
+  return new Set(raw.split('\0').filter(Boolean))
+}
+
+export async function commitFiles(cwd: string, sha: string): Promise<FileStatus[]> {
+  // `stash show -u` is the only form that reports the untracked half as well
+  if (isStashRef(sha))
+    return parseNameStatus(await git(cwd, ['stash', 'show', '-u', '--name-status', '-M', '-z', sha]))
+  const raw = await git(cwd, [
+    'show',
+    '-m',
+    '--first-parent',
+    '--name-status',
+    '-M',
+    '-z',
+    '--format=',
+    sha
+  ])
+  return parseNameStatus(raw)
+}
+
 /** One file's patch inside a commit — same first-parent rule as commitFiles. */
-export const commitDiff = (cwd: string, sha: string, path: string) =>
-  git(cwd, ['show', '-m', '--first-parent', '-M', '--format=', sha, '--', path])
+export async function commitDiff(cwd: string, sha: string, path: string): Promise<string> {
+  if (isStashRef(sha)) {
+    // `stash show` rejects a pathspec, so go through the parents directly
+    if ((await stashUntracked(cwd, sha)).has(path))
+      return newFilePatch(path, await git(cwd, ['show', `${sha}^3:${path}`]))
+    return git(cwd, ['diff', `${sha}^1`, sha, '--', path])
+  }
+  return git(cwd, ['show', '-m', '--first-parent', '-M', '--format=', sha, '--', path])
+}
+
+/**
+ * git has no rename: re-store the same commit under a new message, then drop
+ * the old entry. `store` pushes onto stash@{0}, so the original has shifted
+ * down one slot by the time it is dropped.
+ */
+export async function renameStash(cwd: string, ref: string, message: string) {
+  const m = /^stash@\{(\d+)\}$/.exec(ref)
+  if (!m) throw new Error(`not a stash ref: ${ref}`)
+  const sha = (await git(cwd, ['rev-parse', ref])).trim()
+  const cur = (await git(cwd, ['stash', 'list', '--format=%gd%x1f%gs'])).split('\n').find((l) => l.startsWith(ref + '\x1f'))
+  const { branch } = parseStash(ref, cur?.split('\x1f')[1] ?? '', '')
+  // keep the "On <branch>: " shape so the list still shows where it came from
+  await git(cwd, ['stash', 'store', '-m', branch ? `On ${branch}: ${message}` : message, sha])
+  await git(cwd, ['stash', 'drop', `stash@{${Number(m[1]) + 1}}`])
+  return ''
+}
 
 /** Full patch for one commit, for the Diff tab when a journal row is clicked. */
 export const showCommit = (cwd: string, sha: string) =>
