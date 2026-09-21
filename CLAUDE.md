@@ -4,25 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+The package manager is **bun** (`bun install`), not pnpm/npm. Electron's postinstall only
+runs because `trustedDependencies` in `package.json` lists `electron` and `esbuild`.
+
 ```bash
-pnpm dev                        # electron-vite dev, hot reload
-pnpm build                      # tsc --noEmit (typecheck) + bundle to out/
-pnpm test                       # node:test over src/*/*.test.ts
-pnpm pack                       # build + electron-builder → dist/ (.deb, AppImage)
+bun run dev                     # electron-vite dev, hot reload
+bun run build                   # tsc --noEmit (typecheck) + bundle to out/
+bun run test                    # node:test over src/main + src/shared
+bun run pack                    # build + electron-builder → dist/ (.deb, AppImage)
 
 node --test src/main/git.test.ts                        # single file
 node --test --test-name-pattern 'rename' src/*/*.test.ts  # single test
-npx tsc --noEmit                                        # typecheck only
+bunx tsc --noEmit                                       # typecheck only
 ```
 
-**`pnpm <script>` currently fails before running anything**: `pnpm-workspace.yaml` ships
-placeholder values (`electron: set this to true or false`) under `allowBuilds`, so pnpm's
-pre-run dependency check aborts with `ERR_PNPM_IGNORED_BUILDS`. Either fix that file
-(`true`) or bypass pnpm — `node --test src/*/*.test.ts`, `npx electron-vite dev`.
+Always `bun run <script>` — bare `bun test` / `bun build` are bun's own commands and skip
+these scripts. Tests run under `node --test`, not bun's runner: they are `node:test` files
+and rely on Node 22 type stripping, so Node stays a requirement.
 
-The test glob is `src/**/*.test.ts`, but npm scripts run under `sh`, where `**` is just `*` —
-it only matches **one** directory level (`src/main/`, `src/shared/`). A test placed in
-`src/renderer/src/` will be silently skipped.
+The `test` script lists `src/main/*.test.ts src/shared/*.test.ts` explicitly because scripts
+run under `sh`, where `**` matches **one** directory level. A test placed in a new directory
+(e.g. `src/renderer/src/`) is silently skipped until that path is added to the script.
 
 Requires system `git` on PATH. No native modules, no Rust, no libgit2.
 

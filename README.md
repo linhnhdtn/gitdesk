@@ -6,20 +6,38 @@ libgit2, no Rust, no native modules.
 
 ## Getting started
 
+Install [bun](https://bun.sh) once:
+
+```bash
+curl -fsSL https://bun.sh/install | bash        # Linux / macOS
+# Windows (PowerShell):  powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
+Then:
+
 ```bash
 git clone git@github.com:linhnhdtn/gitdesk.git
 cd gitdesk
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
+
+`bun install` downloads the Electron binary through its postinstall script —
+that only runs because `trustedDependencies` in `package.json` lists `electron`
+and `esbuild`. If `node_modules/electron/dist/` ends up empty, that entry is
+what to check.
 
 You need:
 
 | | |
 |---|---|
-| **Node 22.18+** | the tests run `.ts` files directly, which needs built-in type stripping |
-| **pnpm** | tested on 11.x |
+| **bun 1.2+** | package manager and script runner; tested on 1.3.x |
+| **Node 22.18+** | the tests still run under `node --test`, which needs built-in type stripping |
 | **git on PATH** | the app is a front end for it; `git 2.34` is enough |
+
+`bun run test` shells out to `node --test`, not to `bun test` — the suites are
+`node:test` files and bun's own runner is a different API. Keep Node installed
+even though bun does everything else.
 
 Nothing else. No API keys, no accounts, no services.
 
@@ -30,19 +48,22 @@ is remembered in `localStorage`, so the next launch reopens it.
 ## Commands
 
 ```bash
-pnpm dev      # hot reload; edits to src/main restart Electron, src/renderer swap live
-pnpm build    # tsc --noEmit, then bundle into out/
-pnpm test     # node:test, no framework
-pnpm start    # run the built output without the dev server
-pnpm pack     # .deb + AppImage into dist/
+bun run dev      # hot reload; edits to src/main restart Electron, src/renderer swap live
+bun run build    # tsc --noEmit, then bundle into out/
+bun run test     # node:test, no framework
+bun run start    # run the built output without the dev server
+bun run pack     # .deb + AppImage into dist/
 ```
+
+`bun run <script>` and not bare `bun <script>` — `bun test` and `bun build` are
+bun's own built-in commands and would ignore these scripts entirely.
 
 Narrower runs while working:
 
 ```bash
 node --test src/shared/sidebyside.test.ts                  # one file
 node --test --test-name-pattern 'rename' src/*/*.test.ts   # one test
-npx tsc --noEmit                                           # typecheck only
+bunx tsc --noEmit                                          # typecheck only
 ```
 
 ## What it does
@@ -113,11 +134,11 @@ will not tell you.** `moduleResolution: bundler` accepts an extensionless
 import and `tsc --noEmit` stays quiet, but `node --test` dies with
 `ERR_MODULE_NOT_FOUND` because it loads the sources directly.
 
-**A test outside `src/main/` or `src/shared/` is silently skipped.** The script
-glob is `src/**/*.test.ts`, npm scripts run under `sh`, and there `**` is just
-`*` — one directory level. A test in `src/renderer/src/` matches nothing and
-`pnpm test` reports success without it. Verify with `node --test <path>`
-directly if a new test seems not to run.
+**A test outside `src/main/` or `src/shared/` is silently skipped.** The `test`
+script names those two directories explicitly (`src/main/*.test.ts
+src/shared/*.test.ts`) because a `src/**/*.test.ts` glob expands to one
+directory level in `sh`. Add the directory to the script when tests move, and
+verify with `node --test <path>` directly if a new test seems not to run.
 
 **There is no filesystem watcher.** The working tree is re-read when the window
 regains focus. Edit a file in another program and BeoGit catches up when you
