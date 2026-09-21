@@ -86,6 +86,13 @@ const TOOLBAR: Record<string, React.ReactNode> = {
       <rect x="7.5" y="13" width="9" height="7" rx="0.5" />
     </>
   ),
+  error: (
+    <>
+      <circle cx="12" cy="12" r="9" fill="#fde2e0" stroke={C.red} strokeWidth="1.7" />
+      <path d="M12 7.2v6" stroke={C.red} strokeWidth="2.2" />
+      <path d="M12 16.3v.1" stroke={C.red} strokeWidth="2.5" />
+    </>
+  ),
   warning: (
     <>
       <path d="M12 3.3 2.4 20.2h19.2z" fill="#fde9c4" stroke={C.orange} strokeWidth="1.6" />

@@ -14,6 +14,7 @@ import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
 import { CommitDetail } from './components/CommitDetail.tsx'
+import { ErrorDialog } from './components/ErrorDialog.tsx'
 import { DiscardDialog } from './components/DiscardDialog.tsx'
 import { StashDialog } from './components/StashDialog.tsx'
 import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
@@ -465,14 +466,6 @@ export default function App() {
     <div className="flex h-full flex-col">
       <Toolbar groups={groups} />
 
-      {err && (
-        // git errors are multi-line (its `hint:` lines usually carry the fix), and
-        // a plain div collapses them into one run-on line. pre keeps them; the cap
-        // stops a long one from eating the panes.
-        <pre className="max-h-32 shrink-0 overflow-auto border-b border-rose-300 bg-rose-50 px-3 py-1.5 font-mono text-[13px] whitespace-pre-wrap text-rose-700">
-          {err}
-        </pre>
-      )}
 
       <div className="flex min-h-0 flex-1">
         {/* ── left column ───────────────────────────── */}
@@ -649,6 +642,16 @@ export default function App() {
           staged={compare.staged}
           onChanged={() => act(async () => {})}
           onClose={() => setCompare(null)}
+        />
+      )}
+
+      {err && (
+        <ErrorDialog
+          message={err}
+          // the console records every call, so the last failure is the culprit
+          cmd={cmds.at(-1)?.ok === false ? cmds.at(-1) : undefined}
+          onCopy={copy}
+          onClose={() => setErr('')}
         />
       )}
 
