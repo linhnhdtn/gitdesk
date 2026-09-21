@@ -59,7 +59,7 @@ export function DiscardDialog({
 
   const toStash = () =>
     act(() =>
-      must(api.stashSave(cwd, `Discarded from GitDesk`, picked.map((f) => f.path)))
+      must(api.stashSave(cwd, `Discarded from BeoGit`, picked.map((f) => f.path)))
     )
 
   return (

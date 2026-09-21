@@ -1,4 +1,4 @@
-# GitDesk
+# BeoGit
 
 A personal Git desktop client for Ubuntu, in the shape of SmartGit. Electron +
 React 19 + Tailwind v4. Every git operation shells out to the `git` CLI — no
@@ -120,7 +120,7 @@ glob is `src/**/*.test.ts`, npm scripts run under `sh`, and there `**` is just
 directly if a new test seems not to run.
 
 **There is no filesystem watcher.** The working tree is re-read when the window
-regains focus. Edit a file in another program and GitDesk catches up when you
+regains focus. Edit a file in another program and BeoGit catches up when you
 click back into it. Marked with a `ponytail:` comment in `App.tsx`.
 
 **`ponytail:` comments mark deliberate shortcuts**, each naming its ceiling and

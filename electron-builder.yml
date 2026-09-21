@@ -1,5 +1,5 @@
 appId: vn.com.dtn.gitdesk
-productName: GitDesk
+productName: BeoGit
 directories: { output: dist, buildResources: build }
 files: ['out/**/*', 'package.json']
 linux:

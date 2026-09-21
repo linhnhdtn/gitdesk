@@ -223,7 +223,7 @@ export default function App() {
     return (
       <div className="grid h-full place-items-center bg-bg">
         <div className="text-center">
-          <h1 className="mb-1 text-2xl font-semibold">GitDesk</h1>
+          <h1 className="mb-1 text-2xl font-semibold">BeoGit</h1>
           <p className="mb-6 text-muted">Open a Git repository to start</p>
           <button
             className="rounded border border-line bg-panel px-5 py-2 hover:border-accent hover:text-accent"
