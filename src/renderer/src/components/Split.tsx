@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 /** Drag handle between two panes. Shared by all four splitters. */
 export function Split({
@@ -6,14 +6,20 @@ export function Split({
   value,
   onChange,
   min = 120,
-  max = 900
+  max = 900,
+  /** -1 when the pane being sized sits on the far side of the handle */
+  sign = 1
 }: {
   dir: 'x' | 'y'
   value: number
   onChange: (n: number) => void
   min?: number
   max?: number
+  sign?: 1 | -1
 }) {
+  const raf = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
+
   const down = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       e.preventDefault()
@@ -21,11 +27,23 @@ export function Split({
       el.setPointerCapture(e.pointerId)
       const start = dir === 'x' ? e.clientX : e.clientY
       const base = value
+      let pending = value
+
       const move = (ev: PointerEvent) => {
         const now = dir === 'x' ? ev.clientX : ev.clientY
-        onChange(Math.min(max, Math.max(min, base + (now - start))))
+        pending = Math.min(max, Math.max(min, base + (now - start) * sign))
+        // Coalesce to one update per frame. A pointer reports far more often
+        // than the screen refreshes, and each update re-renders every pane.
+        if (raf.current) return
+        raf.current = requestAnimationFrame(() => {
+          raf.current = 0
+          onChange(pending)
+        })
       }
       const up = () => {
+        cancelAnimationFrame(raf.current)
+        raf.current = 0
+        onChange(pending) // whatever the last frame missed
         el.releasePointerCapture(e.pointerId)
         el.removeEventListener('pointermove', move)
         el.removeEventListener('pointerup', up)
@@ -33,14 +51,19 @@ export function Split({
       el.addEventListener('pointermove', move)
       el.addEventListener('pointerup', up)
     },
-    [dir, value, onChange, min, max]
+    [dir, value, onChange, min, max, sign]
   )
 
+  // The visible line never changes size: a hover that grew the handle relaid
+  // out both panes and made the bar jump away from the pointer. The grab area
+  // is widened with a pseudo-element instead, which costs no layout.
   return (
     <div
       onPointerDown={down}
-      className={`shrink-0 bg-line hover:bg-accent ${
-        dir === 'x' ? 'w-px cursor-col-resize hover:w-[3px]' : 'h-px cursor-row-resize hover:h-[3px]'
+      className={`relative shrink-0 bg-line transition-colors hover:bg-accent before:absolute before:content-[''] ${
+        dir === 'x'
+          ? 'w-px cursor-col-resize before:inset-y-0 before:-inset-x-[3px]'
+          : 'h-px cursor-row-resize before:inset-x-0 before:-inset-y-[3px]'
       }`}
     />
   )

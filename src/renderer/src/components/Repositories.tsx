@@ -19,7 +19,9 @@ export function Repositories({
     return <div className="p-2 text-muted">No repositories yet — use + to add one.</div>
 
   return (
-    <div>
+    // w-max so rows keep their natural width and the pane scrolls to reach the
+    // rest; min-w-full so a short row's highlight still spans the whole pane
+    <div className="w-max min-w-full">
       {repos.map((p) => {
         const b = briefs[p]
         const active = p === cwd
@@ -28,20 +30,25 @@ export function Repositories({
             key={p}
             onClick={() => onPick(p)}
             title={p}
-            className={`group flex cursor-default items-center gap-1.5 px-2 py-[3px] ${
+            className={`group flex cursor-default items-center gap-1.5 px-2 py-[3px] whitespace-nowrap ${
               active ? 'bg-sel' : 'hover:bg-panel'
             }`}
           >
             <Icon name="repo" size={14} />
-            <span className={`truncate ${active ? 'font-semibold' : ''}`}>
-              {b?.name ?? p.split('/').pop()}
-            </span>
-            {b && <span className="shrink-0 text-muted">({b.branch})</span>}
-            {b?.dirty && <span className="shrink-0 text-amber-600" title="Uncommitted changes">●</span>}
+            {/* nothing here truncates: the name identifies the row, so cutting
+                it is the one thing that must not happen. Widen the pane and
+                more comes into view. */}
+            <span className={active ? 'font-semibold' : ''}>{b?.name ?? p.split('/').pop()}</span>
+            {b && <span className="text-muted">({b.branch})</span>}
+            {b?.dirty && <span className="text-amber-600" title="Uncommitted changes">●</span>}
             <button
               onClick={(e) => (e.stopPropagation(), onRemove(p))}
               title="Remove from list (does not delete anything)"
-              className="ml-auto shrink-0 rounded px-1 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-fg"
+              // sticky, so it stays reachable on a row wider than the pane —
+              // it is the only way to drop a repository
+              className={`sticky right-0 ml-auto rounded px-1 pl-1.5 text-muted opacity-0 group-hover:opacity-100 hover:text-rose-700 ${
+                active ? 'bg-sel' : 'bg-bg group-hover:bg-panel'
+              }`}
             >
               ✕
             </button>

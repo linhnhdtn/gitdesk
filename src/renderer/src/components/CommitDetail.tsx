@@ -3,17 +3,23 @@ import { api, must } from '../api.ts'
 import { Files } from './Files.tsx'
 import { Diff, Empty } from './Diff.tsx'
 import { Split } from './Split.tsx'
+import { Graph } from './Graph.tsx'
 import type { Commit, FileStatus } from '../../../main/git.ts'
 
 /** What one commit changed: its files on the left, the selected file's patch on the right. */
 export function CommitDetail({
   cwd,
   refName,
+  commits,
+  onPick,
   onClose
 }: {
   cwd: string
   /** a sha, or a stash entry like stash@{0} — both resolve to one commit */
   refName: string
+  /** history for the graph pane; empty for a stash, which is not in the log */
+  commits: Commit[]
+  onPick: (sha: string) => void
   onClose: () => void
 }) {
   const [commit, setCommit] = useState<Commit | null>(null)
@@ -22,6 +28,7 @@ export function CommitDetail({
   const [diff, setDiff] = useState('')
   const [err, setErr] = useState('')
   const [width, setWidth] = useState(340)
+  const [graphH, setGraphH] = useState(230)
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -125,6 +132,20 @@ export function CommitDetail({
             {sel ? <Diff text={diff} /> : <Empty>Select a file</Empty>}
           </div>
         </div>
+
+        {!stash && commits.length > 0 && (
+          <>
+            <Split dir="y" sign={-1} value={graphH} min={80} max={700} onChange={setGraphH} />
+            <div style={{ height: graphH }} className="flex shrink-0 flex-col">
+              <div className="flex h-7 shrink-0 items-center border-b border-line bg-panel px-2 font-medium">
+                Graph
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto">
+                <Graph commits={commits} sel={refName} onSelect={onPick} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

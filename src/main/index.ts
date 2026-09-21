@@ -40,8 +40,8 @@ handle('repo:pick', async () => {
 })
 
 handle('git:status', (cwd: string) => G.status(cwd))
-handle('git:log', (cwd: string, limit: number, skip: number, all: boolean) =>
-  G.log(cwd, limit, skip, all)
+handle('git:log', (cwd: string, limit: number, skip: number, all: boolean, fp: boolean) =>
+  G.log(cwd, limit, skip, all, fp)
 )
 handle('git:diff', (cwd: string, path: string, staged: boolean, context: number) =>
   G.diffFile(cwd, path, staged, context)

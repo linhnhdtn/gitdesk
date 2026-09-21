@@ -6,8 +6,8 @@ const call = <T>(ch: string, ...a: unknown[]): Promise<Res<T>> => ipcRenderer.in
 export const api = {
   pickRepo: () => call<string | null>('repo:pick'),
   status: (cwd: string) => call<import('../main/git.ts').RepoStatus>('git:status', cwd),
-  log: (cwd: string, limit = 200, skip = 0, all = true) =>
-    call<import('../main/git.ts').Commit[]>('git:log', cwd, limit, skip, all),
+  log: (cwd: string, limit = 200, skip = 0, all = true, firstParent = false) =>
+    call<import('../main/git.ts').Commit[]>('git:log', cwd, limit, skip, all, firstParent),
   diff: (cwd: string, path: string, staged: boolean, context = 3) =>
     call<string>('git:diff', cwd, path, staged, context),
   readWorktree: (cwd: string, path: string) => call<string>('git:readWorktree', cwd, path),

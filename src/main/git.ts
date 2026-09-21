@@ -142,15 +142,26 @@ export async function commitAt(cwd: string, ref: string): Promise<Commit> {
   return parseCommit((await git(cwd, ['log', '-1', `--format=${LOG_FMT}`, ref])).replace(/\x1e[\s\S]*$/, ''))
 }
 
-export async function log(cwd: string, limit = 200, skip = 0, all = true): Promise<Commit[]> {
+/**
+ * `firstParent` follows only the branch's own line: a merge counts as one step
+ * and the commits it brought in are skipped. It is the backbone of the branch,
+ * and it never combines with `all` — walking every ref has no single line.
+ */
+export async function log(
+  cwd: string,
+  limit = 200,
+  skip = 0,
+  all = true,
+  firstParent = false
+): Promise<Commit[]> {
   const raw = await git(cwd, [
     'log',
     `--format=${LOG_FMT}`,
     `-n${limit}`,
     `--skip=${skip}`,
-    // topo-order so the graph lanes stay contiguous instead of interleaving by date
     '--topo-order',
-    ...(all ? ['--all'] : [])
+    ...(firstParent ? ['--first-parent'] : []),
+    ...(all && !firstParent ? ['--all'] : [])
   ])
   return raw
     .split('\x1e')

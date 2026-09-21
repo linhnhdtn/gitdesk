@@ -27,9 +27,9 @@ const TABS_KEY = 'gitdesk.tabs'
 const HIDE_KEY = 'gitdesk.hidden'
 type BottomTab = 'journal' | 'diff' | 'console'
 const TABS: BottomTab[] = ['journal', 'diff', 'console']
-type Layout = { left: number; repos: number; files: number }
+type Layout = { left: number; repos: number; files: number; journal: number }
 
-const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
+const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240, journal: 170 }
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -48,6 +48,7 @@ export default function App() {
 
   const [st, setSt] = useState<RepoStatus | null>(null)
   const [commits, setCommits] = useState<Commit[]>([])
+  const [mainline, setMainline] = useState<Commit[]>([])
   const [refs, setRefs] = useState<Ref[]>([])
   const [stashes, setStashes] = useState<Stash[]>([])
 
@@ -94,7 +95,12 @@ export default function App() {
   useEffect(() => api.onGitCmd((e) => setCmds((c) => [...c.slice(-199), e])), [])
 
   useEffect(() => localStorage.setItem(LIST_KEY, JSON.stringify(repos)), [repos])
-  useEffect(() => localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)), [layout])
+  // Debounced: dragging a splitter changes this every frame, and a synchronous
+  // localStorage write per frame is felt as stutter.
+  useEffect(() => {
+    const t = setTimeout(() => localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)), 250)
+    return () => clearTimeout(t)
+  }, [layout])
   useEffect(() => localStorage.setItem(TABS_KEY, JSON.stringify(tabOrder)), [tabOrder])
   useEffect(() => localStorage.setItem(HIDE_KEY, JSON.stringify([...hidden])), [hidden])
 
@@ -111,14 +117,16 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     if (!cwd) return
-    const [s, c, r, sl] = await Promise.all([
+    const [s, c, m, r, sl] = await Promise.all([
       must(api.status(cwd)),
       must(api.log(cwd, 300)),
+      must(api.log(cwd, 300, 0, false, true)),
       must(api.refs(cwd)),
       must(api.stashList(cwd))
     ])
     setSt(s)
     setCommits(c)
+    setMainline(m)
     setRefs(r)
     setStashes(sl)
   }, [cwd])
@@ -619,9 +627,12 @@ export default function App() {
           >
             {bottom === 'journal' && (
               <Journal
-                commits={commits}
+                main={mainline}
+                all={commits}
                 sel={commitSel}
                 onSelect={setCommitSel}
+                topHeight={layout.journal}
+                onResize={(n) => setLayout((l) => ({ ...l, journal: n }))}
               />
             )}
             {bottom === 'diff' &&
@@ -632,7 +643,13 @@ export default function App() {
       </div>
 
       {commitSel && cwd && (
-        <CommitDetail cwd={cwd} refName={commitSel} onClose={() => setCommitSel(null)} />
+        <CommitDetail
+          cwd={cwd}
+          refName={commitSel}
+          commits={commits}
+          onPick={setCommitSel}
+          onClose={() => setCommitSel(null)}
+        />
       )}
 
       {compare && cwd && (

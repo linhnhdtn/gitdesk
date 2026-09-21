@@ -1,11 +1,7 @@
-import { useMemo } from 'react'
 import type { Commit } from '../../../main/git.ts'
-import { lanes } from '../../../shared/graph.ts'
+import { Split } from './Split.tsx'
 
 const ROW = 25
-const LANE = 15
-const COLORS = ['#2a6099', '#2e7d32', '#b26a00', '#8e24aa', '#00838f', '#c62828']
-const cx = (l: number) => l * LANE + LANE / 2
 
 /** Split `%D` — "HEAD -> main, origin/main, tag: v1" — into drawable badges. */
 export function decorations(refs: string) {
@@ -21,97 +17,106 @@ export function decorations(refs: string) {
     })
 }
 
-const BADGE: Record<string, string> = {
+export const BADGE: Record<string, string> = {
   head: 'bg-accent text-white',
   local: 'bg-accent/15 text-accent',
   remote: 'bg-ref/15 text-ref',
   tag: 'bg-amber-100 text-amber-800'
 }
 
-export function Journal({
+function Rows({
   commits,
   sel,
-  onSelect
+  onSelect,
+  empty
 }: {
   commits: Commit[]
   sel: string | null
   onSelect: (sha: string) => void
+  empty: string
 }) {
-  const rows = useMemo(() => lanes(commits), [commits])
-  if (!commits.length) return <div className="p-2 text-muted">No commits</div>
-  const railW = (rows[0]?.width ?? 1) * LANE
-
+  if (!commits.length) return <div className="p-2 text-muted">{empty}</div>
   return (
     <div className="min-w-max">
-      {commits.map((c, i) => {
-        const row = rows[i]
-        // lanes arriving from the row above, so the rail joins up seamlessly
-        const incoming = i > 0 ? [...new Set(rows[i - 1].edges.map((e) => e.to))] : []
-        return (
-          <div
-            key={c.hash}
-            onClick={() => onSelect(c.hash)}
-            style={{ height: ROW }}
-            className={`flex cursor-default items-center gap-2 pr-2 ${
-              sel === c.hash ? 'bg-sel' : 'hover:bg-panel'
-            }`}
+      {commits.map((c) => (
+        <div
+          key={c.hash}
+          onClick={() => onSelect(c.hash)}
+          style={{ height: ROW }}
+          className={`flex cursor-default items-center gap-2 pr-2 ${
+            sel === c.hash ? 'bg-sel' : 'hover:bg-panel'
+          }`}
+        >
+          <span
+            className="ml-2 shrink-0 text-[10px] text-accent"
+            title={c.parents.length > 1 ? 'Merge commit' : 'Commit'}
           >
-            <svg width={railW} height={ROW} className="shrink-0" aria-hidden>
-              {incoming
-                // a lane that curves into this commit is drawn by its up-edge instead
-                .filter((l) => !row.edges.some((e) => e.up && e.from === l))
-                .map((l) => (
-                  <line
-                    key={`i${l}`}
-                    x1={cx(l)}
-                    y1={0}
-                    x2={cx(l)}
-                    y2={ROW / 2}
-                    stroke={COLORS[l % COLORS.length]}
-                    strokeWidth={1.5}
-                  />
-                ))}
-              {row.edges.map((e, k) => (
-                <path
-                  key={k}
-                  d={
-                    e.from === e.to
-                      ? `M${cx(e.from)},${ROW / 2}V${ROW}`
-                      : e.up
-                        ? `M${cx(e.from)},0C${cx(e.from)},${ROW * 0.3} ${cx(e.to)},${ROW * 0.2} ${cx(e.to)},${ROW / 2}`
-                        : `M${cx(e.from)},${ROW / 2}C${cx(e.from)},${ROW * 0.8} ${cx(e.to)},${ROW * 0.7} ${cx(e.to)},${ROW}`
-                  }
-                  fill="none"
-                  stroke={COLORS[(e.up ? e.from : e.to) % COLORS.length]}
-                  strokeWidth={1.5}
-                />
-              ))}
-              <circle
-                cx={cx(row.lane)}
-                cy={ROW / 2}
-                r={3.5}
-                fill={c.parents.length > 1 ? COLORS[row.lane % COLORS.length] : '#fff'}
-                stroke={COLORS[row.lane % COLORS.length]}
-                strokeWidth={1.5}
-              />
-            </svg>
+            {c.parents.length > 1 ? '◆' : '○'}
+          </span>
 
-            {decorations(c.refs).map((d) => (
-              <span
-                key={d.kind + d.name}
-                className={`shrink-0 rounded-sm px-1.5 text-[12px] leading-[17px] font-medium ${BADGE[d.kind]}`}
-              >
-                {d.name}
-              </span>
-            ))}
+          {decorations(c.refs).map((d) => (
+            <span
+              key={d.kind + d.name}
+              className={`shrink-0 rounded-sm px-1.5 text-[12px] leading-[17px] font-medium ${BADGE[d.kind]}`}
+            >
+              {d.name}
+            </span>
+          ))}
 
-            <span className="min-w-0 flex-1 truncate">{c.subject}</span>
-            <span className="shrink-0 text-muted">{c.author}</span>
-            <span className="shrink-0 font-mono text-muted">{c.hash.slice(0, 7)}</span>
-            <span className="shrink-0 text-muted">{c.date.slice(0, 16).replace('T', ' ')}</span>
-          </div>
-        )
-      })}
+          <span className="min-w-0 flex-1 truncate">{c.subject}</span>
+          <span className="shrink-0 text-muted">{c.author}</span>
+          <span className="shrink-0 font-mono text-muted">{c.hash.slice(0, 7)}</span>
+          <span className="shrink-0 text-muted">{c.date.slice(0, 16).replace('T', ' ')}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const Head = ({ text, n }: { text: string; n: number }) => (
+  <div className="sticky top-0 z-10 flex shrink-0 gap-1.5 border-b border-line bg-panel px-2 py-0.5 text-[12px] font-medium text-muted">
+    {text} <span>({n})</span>
+  </div>
+)
+
+/**
+ * Two lists: the branch's own line on top, every commit below.
+ *
+ * One combined list buries the merges that say what actually landed among the
+ * commits they brought in — 161 commits here, 81 of them on the line.
+ */
+export function Journal({
+  main,
+  all,
+  sel,
+  onSelect,
+  topHeight,
+  onResize
+}: {
+  main: Commit[]
+  all: Commit[]
+  sel: string | null
+  onSelect: (sha: string) => void
+  topHeight: number
+  onResize: (n: number) => void
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div style={{ height: topHeight }} className="flex shrink-0 flex-col">
+        <Head text="Branch line" n={main.length} />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <Rows commits={main} sel={sel} onSelect={onSelect} empty="No commits" />
+        </div>
+      </div>
+
+      <Split dir="y" value={topHeight} min={60} max={900} onChange={onResize} />
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Head text="All commits" n={all.length} />
+        <div className="min-h-0 flex-1 overflow-auto">
+          <Rows commits={all} sel={sel} onSelect={onSelect} empty="No commits" />
+        </div>
+      </div>
     </div>
   )
 }
