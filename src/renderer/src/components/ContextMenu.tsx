@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Icon } from './Icons.tsx'
 
 export type MenuItem = 'sep' | { label: string; onClick: () => void; disabled?: boolean; danger?: boolean }
 
@@ -144,6 +145,72 @@ export function Prompt({
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+/** A yes/no question that needs to look like the rest of the app. */
+export function Confirm({
+  title,
+  message,
+  note,
+  confirmLabel = 'OK',
+  danger,
+  onCancel,
+  onOk
+}: {
+  title: string
+  message: string
+  /** the reassuring or cautioning line under it */
+  note?: string
+  confirmLabel?: string
+  danger?: boolean
+  onCancel: () => void
+  onOk: () => void
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onCancel])
+
+  return (
+    <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/30 p-6" onClick={onCancel}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[460px] max-w-full rounded-xl border border-line bg-panel shadow-2xl"
+      >
+        <div className="flex items-center rounded-t-xl border-b border-line px-3 py-1.5">
+          <span className="flex-1 text-center font-semibold">{title}</span>
+          <button onClick={onCancel} className="rounded px-2 hover:bg-line" title="Cancel (Esc)">
+            ✕
+          </button>
+        </div>
+        <div className="flex items-start gap-3 px-4 py-4">
+          <Icon name="warning" size={30} />
+          <div className="min-w-0">
+            <div className="font-semibold">{message}</div>
+            {note && <div className="mt-1 text-muted">{note}</div>}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-4 pb-3">
+          <button
+            onClick={onCancel}
+            className="rounded-md border border-line bg-bg px-4 py-1 hover:border-accent"
+          >
+            Cancel
+          </button>
+          <button
+            autoFocus
+            onClick={onOk}
+            className={`rounded-md px-5 py-1 font-medium text-white ${
+              danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-accent hover:brightness-110'
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

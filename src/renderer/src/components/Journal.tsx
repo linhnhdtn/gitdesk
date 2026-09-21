@@ -1,5 +1,4 @@
 import type { Commit } from '../../../main/git.ts'
-import { Split } from './Split.tsx'
 
 const ROW = 25
 
@@ -80,42 +79,24 @@ const Head = ({ text, n }: { text: string; n: number }) => (
 )
 
 /**
- * Two lists: the branch's own line on top, every commit below.
- *
- * One combined list buries the merges that say what actually landed among the
- * commits they brought in — 161 commits here, 81 of them on the line.
+ * The branch's own line: --first-parent, so a merge counts as one step and the
+ * commits it brought in are skipped. The header says so, otherwise the missing
+ * commits look like a bug — the full log is in the commit window's graph.
  */
 export function Journal({
   main,
-  all,
   sel,
-  onSelect,
-  topHeight,
-  onResize
+  onSelect
 }: {
   main: Commit[]
-  all: Commit[]
   sel: string | null
   onSelect: (sha: string) => void
-  topHeight: number
-  onResize: (n: number) => void
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div style={{ height: topHeight }} className="flex shrink-0 flex-col">
-        <Head text="Branch line" n={main.length} />
-        <div className="min-h-0 flex-1 overflow-auto">
-          <Rows commits={main} sel={sel} onSelect={onSelect} empty="No commits" />
-        </div>
-      </div>
-
-      <Split dir="y" value={topHeight} min={60} max={900} onChange={onResize} />
-
-      <div className="flex min-h-0 flex-1 flex-col">
-        <Head text="All commits" n={all.length} />
-        <div className="min-h-0 flex-1 overflow-auto">
-          <Rows commits={all} sel={sel} onSelect={onSelect} empty="No commits" />
-        </div>
+      <Head text="Branch line" n={main.length} />
+      <div className="min-h-0 flex-1 overflow-auto">
+        <Rows commits={main} sel={sel} onSelect={onSelect} empty="No commits" />
       </div>
     </div>
   )

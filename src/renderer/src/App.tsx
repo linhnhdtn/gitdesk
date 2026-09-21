@@ -17,7 +17,7 @@ import { CommitDetail } from './components/CommitDetail.tsx'
 import { ErrorDialog } from './components/ErrorDialog.tsx'
 import { DiscardDialog } from './components/DiscardDialog.tsx'
 import { StashDialog } from './components/StashDialog.tsx'
-import { ContextMenu, Prompt, type MenuItem } from './components/ContextMenu.tsx'
+import { ContextMenu, Prompt, Confirm, type MenuItem } from './components/ContextMenu.tsx'
 import type { RepoStatus, Commit, Ref, Stash, GitCmd, FileStatus } from '../../main/git.ts'
 
 const STORE_KEY = 'gitdesk.repo'
@@ -25,11 +25,12 @@ const LIST_KEY = 'gitdesk.repos'
 const LAYOUT_KEY = 'gitdesk.layout'
 const TABS_KEY = 'gitdesk.tabs'
 const HIDE_KEY = 'gitdesk.hidden'
+const LABEL_KEY = 'gitdesk.labels'
 type BottomTab = 'journal' | 'diff' | 'console'
 const TABS: BottomTab[] = ['journal', 'diff', 'console']
-type Layout = { left: number; repos: number; files: number; journal: number }
+type Layout = { left: number; repos: number; files: number }
 
-const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240, journal: 170 }
+const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -44,6 +45,8 @@ export default function App() {
   const [repos, setRepos] = useState<string[]>(() => read<string[]>(LIST_KEY, []))
   const [cwd, setCwd] = useState<string | null>(() => localStorage.getItem(STORE_KEY))
   const [briefs, setBriefs] = useState<Record<string, Brief>>({})
+  /** cwd -> a name the user typed, so two clones of one folder are tellable apart */
+  const [labels, setLabels] = useState<Record<string, string>>(() => read(LABEL_KEY, {}))
   const [layout, setLayout] = useState<Layout>(() => read(LAYOUT_KEY, DEFAULT_LAYOUT))
 
   const [st, setSt] = useState<RepoStatus | null>(null)
@@ -76,6 +79,14 @@ export default function App() {
     confirmLabel?: string
     onOk: (v: string) => void
   } | null>(null)
+  const [confirm, setConfirm] = useState<{
+    title: string
+    message: string
+    note?: string
+    confirmLabel?: string
+    danger?: boolean
+    onOk: () => void
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -95,6 +106,7 @@ export default function App() {
   useEffect(() => api.onGitCmd((e) => setCmds((c) => [...c.slice(-199), e])), [])
 
   useEffect(() => localStorage.setItem(LIST_KEY, JSON.stringify(repos)), [repos])
+  useEffect(() => localStorage.setItem(LABEL_KEY, JSON.stringify(labels)), [labels])
   // Debounced: dragging a splitter changes this every frame, and a synchronous
   // localStorage write per frame is felt as stutter.
   useEffect(() => {
@@ -133,6 +145,7 @@ export default function App() {
 
   useEffect(() => {
     if (cwd) localStorage.setItem(STORE_KEY, cwd)
+    else localStorage.removeItem(STORE_KEY)
     setSel(new Set())
     setCommitSel(null)
     setCompare(null)
@@ -366,6 +379,68 @@ export default function App() {
     })
   }
 
+  /**
+   * Drop a repository from the sidebar. Moving off it first: removing the one
+   * being viewed used to leave every other pane still showing it, which reads
+   * as the command having done nothing.
+   */
+  const removeRepo = (path: string) => {
+    setRepos((r) => r.filter((x) => x !== path))
+    if (cwd === path) setCwd(repos.find((r) => r !== path) ?? null)
+  }
+
+  /** Right-click on a repository row. */
+  function repoMenu(path: string, x: number, y: number) {
+    const name = briefs[path]?.name ?? path.split('/').pop() ?? path
+    setMenu({
+      x,
+      y,
+      items: [
+        {
+          label: labels[path] ? 'Rename Label…' : 'Add Label…',
+          onClick: () =>
+            setPrompt({
+              title: 'Repository Label',
+              label: `Shown after "${name}" — for telling same-named repositories apart`,
+              initial: labels[path] ?? '',
+              confirmLabel: 'Save',
+              onOk: (v) => setLabels((l) => ({ ...l, [path]: v }))
+            })
+        },
+        ...(labels[path]
+          ? [
+              {
+                label: 'Clear Label',
+                onClick: () =>
+                  setLabels((l) => {
+                    const n = { ...l }
+                    delete n[path]
+                    return n
+                  })
+              }
+            ]
+          : []),
+        'sep' as const,
+        { label: 'Copy Path', onClick: () => copy(path) },
+        { label: 'Reveal in File Manager', onClick: () => run(() => must(api.reveal(path, '.'))) },
+        'sep' as const,
+        {
+          label: 'Remove from List',
+          danger: true,
+          onClick: () =>
+            setConfirm({
+              title: 'Remove Repository',
+              message: `Remove ${labels[path] ? `${name} - ${labels[path]}` : name} from the list?`,
+              note: 'Only this list changes — the folder on disk is left exactly as it is.',
+              confirmLabel: 'Remove',
+              danger: true,
+              onOk: () => removeRepo(path)
+            })
+        }
+      ]
+    })
+  }
+
   /** Right-click on a stash. Nothing here fires from a plain click any more. */
   function stashMenu(st: Stash, x: number, y: number) {
     setMenu({
@@ -492,8 +567,9 @@ export default function App() {
                 repos={repos}
                 briefs={briefs}
                 cwd={cwd}
+                labels={labels}
                 onPick={setCwd}
-                onRemove={(p) => setRepos((r) => r.filter((x) => x !== p))}
+                onMenu={repoMenu}
               />
             </div>
           </Pane>
@@ -626,14 +702,7 @@ export default function App() {
             className="min-h-0 flex-1"
           >
             {bottom === 'journal' && (
-              <Journal
-                main={mainline}
-                all={commits}
-                sel={commitSel}
-                onSelect={setCommitSel}
-                topHeight={layout.journal}
-                onResize={(n) => setLayout((l) => ({ ...l, journal: n }))}
-              />
+              <Journal main={mainline} sel={commitSel} onSelect={setCommitSel} />
             )}
             {bottom === 'diff' &&
               (diff ? <Diff text={diff} /> : <Empty>Select a file or a commit</Empty>)}
@@ -669,6 +738,14 @@ export default function App() {
           cmd={cmds.at(-1)?.ok === false ? cmds.at(-1) : undefined}
           onCopy={copy}
           onClose={() => setErr('')}
+        />
+      )}
+
+      {confirm && (
+        <Confirm
+          {...confirm}
+          onCancel={() => setConfirm(null)}
+          onOk={() => (setConfirm(null), confirm.onOk())}
         />
       )}
 

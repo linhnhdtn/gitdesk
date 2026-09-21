@@ -6,14 +6,17 @@ export function Repositories({
   repos,
   briefs,
   cwd,
+  labels,
   onPick,
-  onRemove
+  onMenu
 }: {
   repos: string[]
   briefs: Record<string, Brief>
   cwd: string | null
+  /** user-set names, for telling two clones of the same folder apart */
+  labels: Record<string, string>
   onPick: (p: string) => void
-  onRemove: (p: string) => void
+  onMenu: (path: string, x: number, y: number) => void
 }) {
   if (!repos.length)
     return <div className="p-2 text-muted">No repositories yet — use + to add one.</div>
@@ -29,8 +32,13 @@ export function Repositories({
           <div
             key={p}
             onClick={() => onPick(p)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onPick(p)
+              onMenu(p, e.clientX, e.clientY)
+            }}
             title={p}
-            className={`group flex cursor-default items-center gap-1.5 px-2 py-[3px] whitespace-nowrap ${
+            className={`flex cursor-default items-center gap-1.5 px-2 py-[3px] whitespace-nowrap ${
               active ? 'bg-sel' : 'hover:bg-panel'
             }`}
           >
@@ -38,20 +46,12 @@ export function Repositories({
             {/* nothing here truncates: the name identifies the row, so cutting
                 it is the one thing that must not happen. Widen the pane and
                 more comes into view. */}
-            <span className={active ? 'font-semibold' : ''}>{b?.name ?? p.split('/').pop()}</span>
+            <span className={active ? 'font-semibold' : ''}>
+              {b?.name ?? p.split('/').pop()}
+              {labels[p] && <span className="font-normal"> - {labels[p]}</span>}
+            </span>
             {b && <span className="text-muted">({b.branch})</span>}
             {b?.dirty && <span className="text-amber-600" title="Uncommitted changes">●</span>}
-            <button
-              onClick={(e) => (e.stopPropagation(), onRemove(p))}
-              title="Remove from list (does not delete anything)"
-              // sticky, so it stays reachable on a row wider than the pane —
-              // it is the only way to drop a repository
-              className={`sticky right-0 ml-auto rounded px-1 pl-1.5 text-muted opacity-0 group-hover:opacity-100 hover:text-rose-700 ${
-                active ? 'bg-sel' : 'bg-bg group-hover:bg-panel'
-              }`}
-            >
-              ✕
-            </button>
           </div>
         )
       })}
