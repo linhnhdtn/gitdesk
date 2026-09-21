@@ -10,6 +10,7 @@ import {
   rowBlocks,
   ribbonInset,
   wordDiff,
+  sourceBlock,
   type Seg,
   type Cell,
   type Compare
@@ -59,8 +60,11 @@ export function FileCompare({
   const [err, setErr] = useState('')
   const [at, setAt] = useState(-1)
   const [reload, setReload] = useState(0)
-  /** blocks the user has taken from the left; nothing hits disk until Save */
-  const [taken, setTaken] = useState<Set<number>>(new Set())
+  /**
+   * Blocks taken from the left, in the order they were taken — a list, not a
+   * set, so Ctrl+Z can lift the most recent one. Nothing hits disk until Save.
+   */
+  const [taken, setTaken] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   /** the three-way prompt that a two-button confirm cannot express */
   const [asking, setAsking] = useState(false)
@@ -74,7 +78,7 @@ export function FileCompare({
   useEffect(() => {
     let dead = false
     setCmp(null)
-    setTaken(new Set())
+    setTaken([])
     setErr('')
     ;(async () => {
       try {
@@ -93,8 +97,11 @@ export function FileCompare({
 
   // Only the working tree is a file we can write; the index is not.
   const editable = !staged && file.kind !== 'untracked'
-  const dirty = taken.size > 0
-  const view = useMemo(() => (cmp && dirty ? takeLeft(cmp, taken) : cmp), [cmp, taken, dirty])
+  const dirty = taken.length > 0
+  const view = useMemo(
+    () => (cmp && dirty ? takeLeft(cmp, new Set(taken)) : cmp),
+    [cmp, taken, dirty]
+  )
 
   const blocks = view?.blocks ?? []
   /** which row starts the block a given row belongs to, -1 outside a block */
@@ -195,7 +202,7 @@ export function FileCompare({
         must(api.writeWorktree(cwd, file.path, rightText(view) + (orig.endsWith('\n') ? '\n' : '')))
       )
       .then(() => {
-        setTaken(new Set())
+        setTaken([])
         setReload((r) => r + 1)
         onChanged?.()
         return true
@@ -209,10 +216,23 @@ export function FileCompare({
 
   const close = () => (dirty ? setAsking(true) : onClose())
 
+  /** `viewRow` is where the block starts in the CURRENT view, not the source. */
+  const take = (viewRow?: number) => {
+    if (!cmp || !view || viewRow === undefined) return
+    const src = sourceBlock(cmp, taken, view.blocks.indexOf(viewRow))
+    if (src !== undefined) setTaken((t) => [...t, src])
+  }
+
+  const undo = () => setTaken((t) => t.slice(0, -1))
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       // while the prompt is up it owns Escape: cancelling it means keep editing
       if (e.key === 'Escape') return void (asking ? setAsking(false) : close())
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !asking) {
+        e.preventDefault()
+        return void undo()
+      }
       if (e.key === 'ArrowDown' && e.altKey) (e.preventDefault(), go(1))
       else if (e.key === 'ArrowUp' && e.altKey) (e.preventDefault(), go(-1))
     }
@@ -251,12 +271,20 @@ export function FileCompare({
           <Tool
             icon="⟳"
             label="Reload"
-            onClick={() => (setTaken(new Set()), setReload((r) => r + 1))}
+            onClick={() => (setTaken([]), setReload((r) => r + 1))}
             title={dirty ? 'Re-read the file and drop the unsaved edits' : 'Re-read the file'}
           />
           <div className="mx-1 h-6 w-px bg-line" />
           <Tool icon="↑" label="Prev. Change" onClick={() => go(-1)} disabled={!blocks.length} />
           <Tool icon="↓" label="Next Change" onClick={() => go(1)} disabled={!blocks.length} />
+          {dirty && (
+            <Tool
+              icon="↶"
+              label="Undo"
+              onClick={undo}
+              title={`Undo the last Take Left (Ctrl+Z) — ${taken.length} pending`}
+            />
+          )}
           <span className="ml-auto text-muted">
             {blocks.length
               ? `${at >= 0 ? at + 1 : '–'} / ${blocks.length} change${blocks.length === 1 ? '' : 's'} · ${changed} changed line${changed === 1 ? '' : 's'}`
@@ -303,7 +331,7 @@ export function FileCompare({
               <Gutter
                 block={rb.get(i)}
                 showButton={editable && !!rb.get(i) && rb.get(i)!.idx === Math.floor(rb.get(i)!.len / 2)}
-                onTake={() => rb.get(i) && setTaken((t) => new Set(t).add(rb.get(i)!.start))}
+                onTake={() => take(rb.get(i)?.start)}
               />
               <Line cell={p.right} kind={kinds.get(i)} segs={segs.get(i)?.right} />
             </div>
@@ -410,7 +438,13 @@ function Gutter({
         <path d={d} fill="currentColor" />
       </svg>
       {showButton && (
-        <div className="absolute inset-0 grid place-items-center">
+        // horizontally the button hugs the side that actually holds the lines:
+        // an insertion lives on the right, a deletion and a replace on the left
+        <div
+          className={`absolute inset-0 flex items-center ${
+            kind === 'insert' ? 'justify-end pr-px' : 'justify-start pl-px'
+          }`}
+        >
           <GutterBtn
             label={BLOCK_GLYPH[kind]}
             title={`${BLOCK_HINT[kind]}. Press Save to write it.`}

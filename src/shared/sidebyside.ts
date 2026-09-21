@@ -251,3 +251,16 @@ export function wordDiff(
 
   return { left: split(l, leftLines.length), right: split(r, rightLines.length) }
 }
+
+/**
+ * Which block of the ORIGINAL diff the view's n-th remaining block came from.
+ *
+ * takeLeft resolves blocks in place, so after the first take the view's rows no
+ * longer line up with the source. Handing a view row straight back to takeLeft
+ * silently takes the wrong block — or, more often, none at all, and the button
+ * looks broken. Blocks are always separated by context, so none can merge and
+ * the surviving ones keep their order.
+ */
+export function sourceBlock(cmp: Compare, taken: readonly number[], n: number): number | undefined {
+  return cmp.blocks.filter((b) => !taken.includes(b))[n]
+}

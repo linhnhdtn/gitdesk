@@ -10,7 +10,8 @@ import {
   rowBlocks,
   ribbonInset,
   wordDiff,
-  type Seg
+  type Seg,
+  sourceBlock
 } from './sidebyside.ts'
 
 const patch = (...body: string[]) =>
@@ -236,4 +237,41 @@ test('wordDiff: always returns one entry per line, even blank ones', () => {
 test('wordDiff: adjacent tokens of the same state are merged into one span', () => {
   const d = wordDiff(['x'], ['completely different text here'])
   assert.equal(d.right[0].length, 1, 'one span, not one per word')
+})
+
+const twoBlocks = () =>
+  sideBySide(patch2('@@ -1,6 +1,7 @@', ' a', '+INS1', '+INS2', ' b', '-OLD', '+NEW', ' c'))
+
+test('sourceBlock: with nothing taken the view maps straight through', () => {
+  const c = twoBlocks()
+  assert.equal(sourceBlock(c, [], 0), c.blocks[0])
+  assert.equal(sourceBlock(c, [], 1), c.blocks[1])
+})
+
+test('sourceBlock: after one take, the view\'s first block is the source\'s second', () => {
+  const c = twoBlocks()
+  assert.equal(sourceBlock(c, [c.blocks[0]], 0), c.blocks[1])
+})
+
+test('sourceBlock: taking the second first still resolves the remaining one', () => {
+  const c = twoBlocks()
+  assert.equal(sourceBlock(c, [c.blocks[1]], 0), c.blocks[0])
+})
+
+test('sourceBlock: past the end is undefined, not a wrong block', () => {
+  const c = twoBlocks()
+  assert.equal(sourceBlock(c, [c.blocks[0], c.blocks[1]], 0), undefined)
+})
+
+test('taking both blocks one after another reaches the left document', () => {
+  // the whole point of sourceBlock: clicking twice used to be a no-op
+  const c = twoBlocks()
+  const taken: number[] = []
+  for (let k = 0; k < 2; k++) {
+    const view = takeLeft(c, new Set(taken))
+    const src = sourceBlock(c, taken, view.blocks.indexOf(view.blocks[0]))
+    assert.notEqual(src, undefined)
+    taken.push(src!)
+  }
+  assert.equal(rightText(takeLeft(c, new Set(taken))), 'a\nb\nOLD\nc')
 })
