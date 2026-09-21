@@ -12,6 +12,8 @@ export const api = {
     call<string>('git:diff', cwd, path, staged, context),
   readWorktree: (cwd: string, path: string) => call<string>('git:readWorktree', cwd, path),
   /** Untracked files need a synthesised patch — `git diff` returns nothing for them. */
+  writeWorktree: (cwd: string, path: string, text: string) =>
+    call<string>('git:writeWorktree', cwd, path, text),
   diffNew: (cwd: string, path: string) => call<string>('git:diffNew', cwd, path),
   remove: (cwd: string, tracked: string[], untracked: string[] = []) =>
     call<string>('git:remove', cwd, tracked, untracked),

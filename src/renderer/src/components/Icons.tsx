@@ -78,6 +78,21 @@ const TOOLBAR: Record<string, React.ReactNode> = {
       <path d="M12 10.5V2M8.5 5.5L12 2l3.5 3.5" stroke={C.orange} />
     </>
   ),
+  /** floppy — the glyph 🖫 is missing from most system fonts and renders as tofu */
+  save: (
+    <>
+      <path d="M4 4.5h11.5L20 9v10.5a.5.5 0 0 1-.5.5h-15a.5.5 0 0 1-.5-.5z" />
+      <path d="M8 4.5v5h7v-5" />
+      <rect x="7.5" y="13" width="9" height="7" rx="0.5" />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="M12 3.3 2.4 20.2h19.2z" fill="#fde9c4" stroke={C.orange} strokeWidth="1.6" />
+      <path d="M12 9.3v5.2" stroke={C.orange} strokeWidth="2.1" />
+      <path d="M12 17.4v.1" stroke={C.orange} strokeWidth="2.4" />
+    </>
+  ),
   console: (
     <>
       <rect x="2.5" y="4" width="19" height="16" rx="2" />

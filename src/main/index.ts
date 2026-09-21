@@ -47,6 +47,9 @@ handle('git:diff', (cwd: string, path: string, staged: boolean, context: number)
   G.diffFile(cwd, path, staged, context)
 )
 handle('git:readWorktree', (cwd: string, path: string) => G.readWorktree(cwd, path))
+handle('git:writeWorktree', (cwd: string, path: string, text: string) =>
+  G.writeWorktree(cwd, path, text)
+)
 handle('git:diffNew', (cwd: string, path: string) => G.diffNew(cwd, path))
 handle('git:remove', (cwd: string, tracked: string[], untracked: string[]) =>
   G.remove(cwd, tracked, untracked)

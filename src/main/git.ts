@@ -186,6 +186,12 @@ export function inRepo(cwd: string, path: string): string {
 
 export const readWorktree = (cwd: string, path: string) => readFile(inRepo(cwd, path), 'utf8')
 
+/** Write a file back into the worktree. Same containment check as reading one. */
+export async function writeWorktree(cwd: string, path: string, text: string) {
+  await writeFile(inRepo(cwd, path), text)
+  return ''
+}
+
 /**
  * Delete files. Tracked ones go through `git rm` so the removal is staged;
  * untracked ones only exist on disk, so they are unlinked directly.

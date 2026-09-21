@@ -647,6 +647,7 @@ export default function App() {
           cwd={cwd}
           file={compare.file}
           staged={compare.staged}
+          onChanged={() => act(async () => {})}
           onClose={() => setCompare(null)}
         />
       )}
