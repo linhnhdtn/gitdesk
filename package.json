@@ -1,6 +1,6 @@
 {
   "name": "gitdesk",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Personal Git desktop client for GitHub + GitLab",
   "author": {
     "name": "linhnh",
@@ -12,8 +12,8 @@
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "start": "electron-vite preview",
-    "test": "node --test src/main/*.test.ts src/shared/*.test.ts",
-    "pack": "electron-vite build && electron-builder --linux deb AppImage"
+    "test": "node --test src/main/*.test.ts src/shared/*.test.ts scripts/*.test.ts",
+    "pack": "bun run build && node scripts/pack-version.ts && electron-builder --linux deb AppImage"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",

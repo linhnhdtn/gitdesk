@@ -56,11 +56,20 @@ bun run dev      # hot reload; edits to src/main restart Electron, src/renderer 
 bun run build    # tsc --noEmit, then bundle into out/
 bun run test     # node:test, no framework
 bun run start    # run the built output without the dev server
-bun run pack     # .deb + AppImage into dist/
+bun run pack     # build, increment patch version, then .deb + AppImage into dist/
 ```
 
 `bun run <script>` and not bare `bun <script>` — `bun test` and `bun build` are
 bun's own built-in commands and would ignore these scripts entirely.
+
+Each `bun run pack` increments `package.json`'s patch version after a successful
+build: `1.0.0` → `1.0.1` → `1.0.2`. Installers include this version in their names,
+for example `dist/gitdesk_1.0.1_amd64.deb` and `dist/BeoGit-1.0.1.AppImage`.
+Existing installers are kept; versions already present in `dist/` within the
+same major/minor series are skipped. If packaging fails after the increment,
+that version stays reserved and the next run increments again. No Git commit
+or tag is created automatically. Packaging metadata and `linux-unpacked/`
+still reflect the latest run. Run packs one at a time in a checkout.
 
 Narrower runs while working:
 
