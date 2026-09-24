@@ -26,7 +26,10 @@ The `test` script lists `src/main/*.test.ts src/shared/*.test.ts` explicitly bec
 run under `sh`, where `**` matches **one** directory level. A test placed in a new directory
 (e.g. `src/renderer/src/`) is silently skipped until that path is added to the script.
 
-Requires system `git` on PATH. No native modules, no Rust, no libgit2.
+Requires system `git` on PATH. There is no Rust or libgit2. The embedded
+terminal uses `node-pty` as a production/trusted dependency; Electron Builder
+rebuilds and unpacks it. `@xterm/xterm` stays in the renderer; PTY processes
+stay in main.
 
 ## Architecture
 
@@ -40,6 +43,10 @@ src/preload/  contextBridge → window.api. contextIsolation on, sandbox off.
 src/renderer/ React 19 + Tailwind v4. No node access at all.
 src/shared/   Pure logic imported by both sides, each with a node:test file.
 ```
+
+`src/main/terminal.ts` owns PTYs by webContents/repository. `src/main/ai.ts`
+builds bounded diff context and invokes only the fixed `codex`/`claude` CLI
+providers; quick actions must remain read-only.
 
 ### Adding a capability = four edits in lockstep
 

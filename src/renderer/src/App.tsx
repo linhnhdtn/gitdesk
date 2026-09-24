@@ -10,6 +10,7 @@ import { FileFilters } from './components/FileFilters.tsx'
 import { isStaged, category, counts as tally, type Category } from '../../shared/filestate.ts'
 import { Journal } from './components/Journal.tsx'
 import { Console } from './components/Console.tsx'
+import { TerminalWorkspace } from './components/Terminal.tsx'
 import { Tabs } from './components/Tabs.tsx'
 import { FileCompare } from './components/FileCompare.tsx'
 import { CommitDialog } from './components/CommitDialog.tsx'
@@ -26,8 +27,8 @@ const LAYOUT_KEY = 'gitdesk.layout'
 const TABS_KEY = 'gitdesk.tabs'
 const HIDE_KEY = 'gitdesk.hidden'
 const LABEL_KEY = 'gitdesk.labels'
-type BottomTab = 'journal' | 'diff' | 'console'
-const TABS: BottomTab[] = ['journal', 'diff', 'console']
+type BottomTab = 'journal' | 'diff' | 'terminal' | 'console'
+const TABS: BottomTab[] = ['journal', 'diff', 'terminal', 'console']
 type Layout = { left: number; repos: number; files: number }
 
 const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
@@ -39,6 +40,16 @@ function read<T>(key: string, fallback: T): T {
   } catch {
     return fallback
   }
+}
+
+function restoreTabs(saved: BottomTab[]): BottomTab[] {
+  const next = saved.filter((tab) => TABS.includes(tab))
+  for (const tab of TABS) {
+    if (next.includes(tab)) continue
+    if (tab === 'terminal' && next.includes('diff')) next.splice(next.indexOf('diff') + 1, 0, tab)
+    else next.push(tab)
+  }
+  return next
 }
 
 export default function App() {
@@ -64,10 +75,11 @@ export default function App() {
     // A saved order from an older build can name a tab that is gone or miss a
     // new one, so reconcile against TABS rather than trusting it outright.
     const saved = read<BottomTab[]>(TABS_KEY, [])
-    return [...saved.filter((t) => TABS.includes(t)), ...TABS.filter((t) => !saved.includes(t))]
+    return restoreTabs(saved)
   })
 
   const [diff, setDiff] = useState('')
+  const [commitDraft, setCommitDraft] = useState('')
   const [modal, setModal] = useState<'commit' | 'discard' | 'stash' | null>(null)
   const [compare, setCompare] = useState<{ file: FileStatus; staged: boolean } | null>(null)
   const [cmds, setCmds] = useState<GitCmd[]>([])
@@ -102,7 +114,7 @@ export default function App() {
     }
   }, [])
 
-  // Console feed. The only main->renderer push in the app.
+  // Console feed from the main process.
   useEffect(() => api.onGitCmd((e) => setCmds((c) => [...c.slice(-199), e])), [])
 
   useEffect(() => localStorage.setItem(LIST_KEY, JSON.stringify(repos)), [repos])
@@ -672,7 +684,7 @@ export default function App() {
                 onReorder={setTabOrder}
                 label={(t) => (
                   <>
-                    {t}
+                    {t === 'terminal' ? 'AI' : t}
                     {t === 'console' && !!cmds.length && (
                       <span className="ml-1 font-normal text-muted">{cmds.length}</span>
                     )}
@@ -689,7 +701,7 @@ export default function App() {
                 >
                   clear
                 </button>
-              ) : (
+              ) : bottom === 'terminal' ? null : (
                 <button
                   onClick={() => run(refresh)}
                   className="rounded px-1.5 hover:bg-line"
@@ -707,6 +719,17 @@ export default function App() {
             {bottom === 'diff' &&
               (diff ? <Diff text={diff} /> : <Empty>Select a file or a commit</Empty>)}
             {bottom === 'console' && <Console cmds={cmds} />}
+            <TerminalWorkspace
+              repos={repos}
+              cwd={cwd}
+              active={bottom === 'terminal'}
+              files={st?.files ?? []}
+              selected={picked.map((f) => f.path)}
+              onUseCommit={(message) => {
+                setCommitDraft(message)
+                setModal('commit')
+              }}
+            />
           </Pane>
         </div>
       </div>
@@ -781,8 +804,9 @@ export default function App() {
         <CommitDialog
           cwd={cwd}
           files={st.files}
-          onClose={() => setModal(null)}
-          onDone={() => (setModal(null), setSel(new Set()), act(async () => {}))}
+          initialMessage={commitDraft}
+          onClose={() => (setModal(null), setCommitDraft(''))}
+          onDone={() => (setModal(null), setCommitDraft(''), setSel(new Set()), act(async () => {}))}
         />
       )}
 

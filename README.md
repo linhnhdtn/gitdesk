@@ -41,6 +41,10 @@ even though bun does everything else.
 
 Nothing else. No API keys, no accounts, no services.
 
+The **Terminal** tab works without extra setup. Its AI shortcuts optionally use
+an installed and logged-in `codex` or `claude` CLI; credentials stay with that
+CLI and are never stored by BeoGit.
+
 On first launch the window is empty — press **Open Repository…** (or the `+` in
 the Repositories pane) and pick any folder that contains a `.git`. The choice
 is remembered in `localStorage`, so the next launch reopens it.
@@ -102,11 +106,17 @@ file and jumps to it.
 stderr when one fails. A failure also raises a dialog carrying the command that
 caused it.
 
+**Terminal + AI** — a real shell per repository, kept alive while switching
+repositories. Quick actions review the selected/staged/local diff or draft a
+commit message through Codex or Claude in read-only mode. Interactive AI edits
+remain explicit: run the CLI yourself in the terminal.
+
 ## Layout
 
 | Path | What |
 |---|---|
 | `src/main/git.ts` | every git call. One `git(cwd, args)` shells out; everything else wraps it |
+| `src/main/ai.ts`, `terminal.ts` | read-only AI tasks and PTY session management |
 | `src/main/index.ts` | Electron window and IPC handlers |
 | `src/preload/index.ts` | the typed `window.api` bridge; contextIsolation on |
 | `src/renderer/src/App.tsx` | state and layout; the panes are components beside it |

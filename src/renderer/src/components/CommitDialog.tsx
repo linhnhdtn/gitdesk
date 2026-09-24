@@ -25,11 +25,13 @@ function tally(files: FileStatus[], source: Source) {
 export function CommitDialog({
   cwd,
   files,
+  initialMessage = '',
   onClose,
   onDone
 }: {
   cwd: string
   files: FileStatus[]
+  initialMessage?: string
   onClose: () => void
   onDone: () => void
 }) {
@@ -37,7 +39,7 @@ export function CommitDialog({
     files.some(isStaged) ? 'staged' : 'local'
   )
   const [checked, setChecked] = useState<Set<string>>(new Set())
-  const [msg, setMsg] = useState('')
+  const [msg, setMsg] = useState(initialMessage)
   const [amend, setAmend] = useState(false)
   const [signoff, setSignoff] = useState(false)
   const [noVerify, setNoVerify] = useState(false)

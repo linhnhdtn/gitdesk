@@ -1,6 +1,15 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, clipboard, webContents } from 'electron'
 import { join } from 'node:path'
 import * as G from './git.ts'
+import { AIRunner, detectAIProviders } from './ai.ts'
+import { TerminalManager } from './terminal.ts'
+import type { AIRequest } from '../shared/ai.ts'
+
+const terminals = new TerminalManager(
+  (owner, event) => webContents.fromId(owner)?.send('terminal:data', event),
+  (owner, event) => webContents.fromId(owner)?.send('terminal:exit', event)
+)
+const ai = new AIRunner()
 
 function createWindow() {
   const icon = app.isPackaged
@@ -13,6 +22,11 @@ function createWindow() {
     icon,
     autoHideMenuBar: true,
     webPreferences: { preload: join(import.meta.dirname, '../preload/index.mjs'), sandbox: false }
+  })
+  const owner = win.webContents.id
+  win.webContents.on('destroyed', () => {
+    terminals.disposeOwner(owner)
+    ai.disposeOwner(owner)
   })
   win.on('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -33,6 +47,24 @@ function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => Pro
       return { ok: false as const, error: String(e.message ?? e) }
     }
   })
+}
+
+/** Session-bearing IPC also receives the sender id, so another window cannot control it. */
+function handleSender<A extends unknown[], R>(
+  channel: string,
+  fn: (sender: number, ...args: A) => Promise<R> | R
+) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return { ok: true as const, data: await fn(event.sender.id, ...(args as A)) }
+    } catch (e: any) {
+      return { ok: false as const, error: String(e.message ?? e) }
+    }
+  })
+}
+
+async function assertRepo(cwd: string) {
+  await G.git(cwd, ['rev-parse', '--git-dir'])
 }
 
 handle('repo:pick', async () => {
@@ -100,6 +132,27 @@ handle('sys:openPath', async (cwd: string, path: string) => {
 })
 handle('sys:copy', (text: string) => clipboard.writeText(text))
 handle('sys:reveal', (cwd: string, path: string) => shell.showItemInFolder(G.inRepo(cwd, path)))
+
+handleSender('terminal:start', async (owner, cwd: string, cols: number, rows: number) => {
+  await assertRepo(cwd)
+  return terminals.start(owner, cwd, cols, rows)
+})
+handleSender('terminal:restart', async (owner, cwd: string, cols: number, rows: number) => {
+  await assertRepo(cwd)
+  return terminals.restart(owner, cwd, cols, rows)
+})
+handleSender('terminal:write', (owner, id: string, data: string) => terminals.write(owner, id, data))
+handleSender('terminal:resize', (owner, id: string, cols: number, rows: number) =>
+  terminals.resize(owner, id, cols, rows)
+)
+handleSender('terminal:dispose', (owner, id: string) => terminals.dispose(owner, id))
+
+handle('ai:providers', () => detectAIProviders())
+handleSender('ai:run', async (owner, request: AIRequest) => {
+  await assertRepo(request.cwd)
+  return ai.run(owner, request)
+})
+handleSender('ai:cancel', (owner, requestId: string) => ai.cancel(owner, requestId))
 
 // Single-window app, so no ref to keep and no listener to tear down on re-create.
 G.bus.on('cmd', (e) => BrowserWindow.getAllWindows()[0]?.webContents.send('git:cmd', e))

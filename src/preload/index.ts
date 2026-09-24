@@ -59,7 +59,31 @@ export const api = {
     call<string>('git:commitDiff', cwd, sha, path),
   showCommit: (cwd: string, sha: string) => call<string>('git:showCommit', cwd, sha),
 
-  /** Main->renderer push (the only one). Returns an unsubscribe for useEffect cleanup. */
+  terminalStart: (cwd: string, cols: number, rows: number) =>
+    call<import('../main/terminal.ts').TerminalSession>('terminal:start', cwd, cols, rows),
+  terminalRestart: (cwd: string, cols: number, rows: number) =>
+    call<import('../main/terminal.ts').TerminalSession>('terminal:restart', cwd, cols, rows),
+  terminalWrite: (id: string, data: string) => call<void>('terminal:write', id, data),
+  terminalResize: (id: string, cols: number, rows: number) =>
+    call<void>('terminal:resize', id, cols, rows),
+  terminalDispose: (id: string) => call<boolean>('terminal:dispose', id),
+  onTerminalData: (cb: (event: import('../main/terminal.ts').TerminalData) => void) => {
+    const h = (_: unknown, event: import('../main/terminal.ts').TerminalData) => cb(event)
+    ipcRenderer.on('terminal:data', h)
+    return () => void ipcRenderer.off('terminal:data', h)
+  },
+  onTerminalExit: (cb: (event: import('../main/terminal.ts').TerminalExit) => void) => {
+    const h = (_: unknown, event: import('../main/terminal.ts').TerminalExit) => cb(event)
+    ipcRenderer.on('terminal:exit', h)
+    return () => void ipcRenderer.off('terminal:exit', h)
+  },
+
+  aiProviders: () => call<import('../shared/ai.ts').AIProviderInfo[]>('ai:providers'),
+  aiRun: (request: import('../shared/ai.ts').AIRequest) =>
+    call<import('../shared/ai.ts').AIResult>('ai:run', request),
+  aiCancel: (requestId: string) => call<boolean>('ai:cancel', requestId),
+
+  /** Git command feed. Returns an unsubscribe for useEffect cleanup. */
   onGitCmd: (cb: (e: import('../main/git.ts').GitCmd) => void) => {
     const h = (_: unknown, e: import('../main/git.ts').GitCmd) => cb(e)
     ipcRenderer.on('git:cmd', h)
