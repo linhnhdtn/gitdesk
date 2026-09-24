@@ -27,11 +27,13 @@ const LAYOUT_KEY = 'gitdesk.layout'
 const TABS_KEY = 'gitdesk.tabs'
 const HIDE_KEY = 'gitdesk.hidden'
 const LABEL_KEY = 'gitdesk.labels'
+const THEME_KEY = 'gitdesk.theme'
 type BottomTab = 'journal' | 'diff' | 'terminal' | 'console'
 const TABS: BottomTab[] = ['journal', 'diff', 'terminal', 'console']
 type Layout = { left: number; repos: number; files: number }
 
 const DEFAULT_LAYOUT: Layout = { left: 260, repos: 240, files: 240 }
+const pepeIcon = new URL('../../../build/icons/32x32.png', import.meta.url).href
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -53,6 +55,9 @@ function restoreTabs(saved: BottomTab[]): BottomTab[] {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+  )
   const [repos, setRepos] = useState<string[]>(() => read<string[]>(LIST_KEY, []))
   const [cwd, setCwd] = useState<string | null>(() => localStorage.getItem(STORE_KEY))
   const [briefs, setBriefs] = useState<Record<string, Brief>>({})
@@ -127,6 +132,10 @@ export default function App() {
   }, [layout])
   useEffect(() => localStorage.setItem(TABS_KEY, JSON.stringify(tabOrder)), [tabOrder])
   useEffect(() => localStorage.setItem(HIDE_KEY, JSON.stringify([...hidden])), [hidden])
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
 
   const refreshBriefs = useCallback(async () => {
     const list = await Promise.all(
@@ -554,12 +563,20 @@ export default function App() {
         onClick: () => setBottom((b) => (b === 'console' ? 'journal' : 'console')),
         title: 'Command console (Ctrl+`)'
       }
+    ],
+    [
+      {
+        label: theme === 'dark' ? 'Light' : 'Dark',
+        icon: theme === 'dark' ? 'sun' : 'moon',
+        onClick: () => setTheme((current) => (current === 'dark' ? 'light' : 'dark')),
+        title: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`
+      }
     ]
   ]
 
   return (
     <div className="flex h-full flex-col">
-      <Toolbar groups={groups} />
+      <Toolbar groups={groups} brandIcon={pepeIcon} repositoryPath={cwd ?? undefined} />
 
 
       <div className="flex min-h-0 flex-1">

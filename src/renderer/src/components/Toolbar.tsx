@@ -1,9 +1,28 @@
 import { Icon, type ToolbarIcon } from './Icons.tsx'
 
 /** SmartGit's icon strip. Each group is separated by a rule. */
-export function Toolbar({ groups }: { groups: Item[][] }) {
+export function Toolbar({
+  groups,
+  brandIcon,
+  repositoryPath
+}: {
+  groups: Item[][]
+  brandIcon?: string
+  repositoryPath?: string
+}) {
+  const normalizedPath = repositoryPath?.replaceAll('\\', '/') ?? ''
+  const shortPath = normalizedPath
+    .replace(/^\/(?:home|Users)\/[^/]+(?=\/|$)/, '~')
+    .replace(/^[A-Za-z]:\/Users\/[^/]+(?=\/|$)/, '~')
+  const repositoryName = normalizedPath.split('/').filter(Boolean).pop() ?? normalizedPath
+
   return (
     <div className="flex h-12 shrink-0 items-stretch gap-1 border-b border-line bg-panel px-2">
+      {brandIcon && (
+        <div className="flex w-10 shrink-0 items-center justify-center" title="BeoGit">
+          <img src={brandIcon} alt="BeoGit" className="h-8 w-8 object-contain" />
+        </div>
+      )}
       {groups.map((g, i) => (
         <div key={i} className="flex items-stretch gap-0.5">
           {i > 0 && <div className="mx-1 my-2 w-px bg-line" />}
@@ -12,6 +31,13 @@ export function Toolbar({ groups }: { groups: Item[][] }) {
           ))}
         </div>
       ))}
+      {repositoryPath && (
+        <div className="ml-auto flex min-w-0 items-center px-3 text-[14px] text-fg">
+          <span className="max-w-[42vw] truncate" title={repositoryPath}>
+            {repositoryName} - [{shortPath}]
+          </span>
+        </div>
+      )}
     </div>
   )
 }

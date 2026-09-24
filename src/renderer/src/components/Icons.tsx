@@ -105,6 +105,15 @@ const TOOLBAR: Record<string, React.ReactNode> = {
       <rect x="2.5" y="4" width="19" height="16" rx="2" />
       <path d="M6.5 9.5l3 2.5-3 2.5M12.5 15h5" />
     </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" stroke={C.orange} />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke={C.orange} />
+    </>
+  ),
+  moon: (
+    <path d="M19.5 15.4A8 8 0 0 1 8.6 4.5 8.2 8.2 0 1 0 19.5 15.4z" stroke={C.blue} />
   )
 }
 
