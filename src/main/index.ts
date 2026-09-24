@@ -3,10 +3,14 @@ import { join } from 'node:path'
 import * as G from './git.ts'
 
 function createWindow() {
+  const icon = app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(app.getAppPath(), 'build/icons/32x32.png')
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
+    icon,
     autoHideMenuBar: true,
     webPreferences: { preload: join(import.meta.dirname, '../preload/index.mjs'), sandbox: false }
   })

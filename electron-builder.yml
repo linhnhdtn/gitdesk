@@ -2,6 +2,10 @@ appId: vn.com.dtn.gitdesk
 productName: BeoGit
 directories: { output: dist, buildResources: build }
 files: ['out/**/*', 'package.json']
+extraResources:
+  - from: build/icons/32x32.png
+    to: icon.png
 linux:
   target: [deb, AppImage]
   category: Development
+  icon: build/icons
