@@ -283,8 +283,22 @@ export const fetch = (cwd: string) => git(cwd, ['fetch', '--all', '--prune'])
 export const pull = (cwd: string, rebase = true) =>
   git(cwd, ['pull', rebase ? '--rebase' : '--no-rebase'])
 /** ponytail: force-with-lease only, never bare --force */
-export const push = (cwd: string, force = false) =>
-  git(cwd, ['push', ...(force ? ['--force-with-lease'] : [])])
+export async function push(cwd: string, force = false) {
+  const raw = await git(cwd, ['status', '--porcelain=v2', '-z', '--branch', '-uno'])
+  const { branch, upstream } = parseStatusV2(raw)
+  if (branch === '(detached)') throw new Error('Cannot push from detached HEAD. Check out a branch first.')
+  if (raw.split('\0').includes('# branch.oid (initial)'))
+    throw new Error('Cannot push a branch without commits. Create a commit first.')
+
+  const args = ['push', ...(force ? ['--force-with-lease'] : [])]
+  if (!upstream) {
+    const remotes = (await git(cwd, ['remote'])).trim().split('\n')
+    if (!remotes.includes('origin'))
+      throw new Error('Cannot push: this branch has no upstream and remote "origin" is missing. Configure origin first.')
+    args.push('--set-upstream', 'origin', branch)
+  }
+  return git(cwd, args)
+}
 
 export type Ref = {
   kind: 'local' | 'remote' | 'tag'
